@@ -1,7 +1,7 @@
 import { Injectable, Inject } from '@nestjs/common';
 import { DATABASE_TOKEN } from '../../db/database.module';
 import { eq, and, desc, sql, gte, lte } from 'drizzle-orm';
-import { invStockTransactions, invItems } from '../../db/schema';
+import { invStockTransactions, invItems, users } from '../../db/schema';
 import { PaginationQuery, PaginationResponse } from '../../common/dto/pagination.dto';
 import { TimelineQueryDto } from './dto/history.dto';
 
@@ -12,20 +12,35 @@ export class HistoryService {
   ) {}
 
   /**
-   * 获取单物品完整变更记录（invStockTransactions WHERE itemId ORDER BY createdAt DESC）
+   * 获取单物品完整变更记录
    */
   async getItemHistory(itemId: number) {
-    return this.db.select().from(invStockTransactions)
+    return this.db.select({
+      id: invStockTransactions.id,
+      itemId: invStockTransactions.itemId,
+      batchId: invStockTransactions.batchId,
+      type: invStockTransactions.type,
+      quantity: invStockTransactions.quantity,
+      unit: invStockTransactions.unit,
+      fromLocationId: invStockTransactions.fromLocationId,
+      toLocationId: invStockTransactions.toLocationId,
+      userId: invStockTransactions.userId,
+      source: invStockTransactions.source,
+      note: invStockTransactions.note,
+      createdAt: invStockTransactions.createdAt,
+      userName: users.name,
+    })
+      .from(invStockTransactions)
+      .leftJoin(users, eq(invStockTransactions.userId, users.id))
       .where(eq(invStockTransactions.itemId, itemId))
       .orderBy(desc(invStockTransactions.createdAt))
       .all();
   }
 
   /**
-   * 家庭级时间线：join invItems 过滤 familyId + 条件过滤 + 分页
+   * 家庭级时间线：join invItems + users 过滤 familyId + 条件过滤 + 分页
    */
   async getFamilyTimeline(familyId: number, filters: TimelineQueryDto, pagination: PaginationQuery) {
-    // 构建查询条件
     const conditions: any[] = [eq(invItems.familyId, familyId)];
 
     if (filters.type) {
@@ -42,6 +57,12 @@ export class HistoryService {
       const endDate = new Date(filters.endDate);
       conditions.push(lte(invStockTransactions.createdAt, endDate));
     }
+    if (filters.itemId) {
+      conditions.push(eq(invStockTransactions.itemId, filters.itemId));
+    }
+    if (filters.userId) {
+      conditions.push(eq(invStockTransactions.userId, filters.userId));
+    }
 
     const whereClause = and(...conditions);
 
@@ -53,7 +74,7 @@ export class HistoryService {
       .get();
     const total = countResult?.count ?? 0;
 
-    // 分页查询数据
+    // 分页查询数据（含 userName）
     const offset = (pagination.page - 1) * pagination.limit;
     const data = await this.db.select({
       id: invStockTransactions.id,
@@ -69,9 +90,11 @@ export class HistoryService {
       note: invStockTransactions.note,
       createdAt: invStockTransactions.createdAt,
       itemName: invItems.name,
+      userName: users.name,
     })
       .from(invStockTransactions)
       .innerJoin(invItems, eq(invStockTransactions.itemId, invItems.id))
+      .leftJoin(users, eq(invStockTransactions.userId, users.id))
       .where(whereClause)
       .orderBy(desc(invStockTransactions.createdAt))
       .limit(pagination.limit)
@@ -81,7 +104,54 @@ export class HistoryService {
     return new PaginationResponse(data, total, pagination.page, pagination.limit);
   }
 
-  /** 扫描日志 — 已移除数据库存储，改为 Logger 输出 */
+  /**
+   * 日志汇总统计
+   */
+  async getJournalSummary(familyId: number) {
+    // 按类型统计
+    const byType = await this.db.select({
+      type: invStockTransactions.type,
+      count: sql<number>`count(*)`,
+      totalQuantity: sql<number>`sum(${invStockTransactions.quantity})`,
+    })
+      .from(invStockTransactions)
+      .innerJoin(invItems, eq(invStockTransactions.itemId, invItems.id))
+      .where(eq(invItems.familyId, familyId))
+      .groupBy(invStockTransactions.type)
+      .all();
+
+    // 按用户统计
+    const byUser = await this.db.select({
+      userId: invStockTransactions.userId,
+      userName: users.name,
+      count: sql<number>`count(*)`,
+    })
+      .from(invStockTransactions)
+      .innerJoin(invItems, eq(invStockTransactions.itemId, invItems.id))
+      .leftJoin(users, eq(invStockTransactions.userId, users.id))
+      .where(eq(invItems.familyId, familyId))
+      .groupBy(invStockTransactions.userId)
+      .all();
+
+    // 按物品统计（Top 10）
+    const byItem = await this.db.select({
+      itemId: invStockTransactions.itemId,
+      itemName: invItems.name,
+      count: sql<number>`count(*)`,
+      totalQuantity: sql<number>`sum(${invStockTransactions.quantity})`,
+    })
+      .from(invStockTransactions)
+      .innerJoin(invItems, eq(invStockTransactions.itemId, invItems.id))
+      .where(eq(invItems.familyId, familyId))
+      .groupBy(invStockTransactions.itemId)
+      .orderBy(desc(sql`count(*)`))
+      .limit(10)
+      .all();
+
+    return { byType, byUser, byItem };
+  }
+
+  /** 扫描日志 */
   async getScanLogs(_familyId: number, _limit?: number) {
     return [];
   }

@@ -23,6 +23,11 @@
           <template #icon><n-icon :size="16"><AddOutline /></n-icon></template>
           快速入库
         </n-button>
+        <n-dropdown :options="importExportOptions" trigger="click" @select="handleImportExport">
+          <n-button size="small" quaternary>
+            <template #icon><n-icon :size="16"><EllipsisVerticalOutline /></n-icon></template>
+          </n-button>
+        </n-dropdown>
       </div>
     </div>
 
@@ -588,6 +593,21 @@
               </n-input-number>
             </div>
           </div>
+          <div class="qs-form-grid">
+            <div class="qs-form-row">
+              <label class="qs-label">批次号</label>
+              <n-input v-model:value="quickStockInBatchNumber" placeholder="可选" />
+            </div>
+            <div class="qs-form-row">
+              <label class="qs-label">到期日</label>
+              <n-date-picker
+                v-model:value="quickStockInExpiryDate"
+                type="date"
+                clearable
+                style="width: 100%"
+              />
+            </div>
+          </div>
           <div class="qs-form-row">
             <label class="qs-label">存放位置</label>
             <n-select v-model:value="quickStockInLocationId" :options="locationOptions" clearable placeholder="选择位置" />
@@ -637,6 +657,15 @@
         <n-form-item label="消耗数量">
           <n-input-number v-model:value="inlineConsumeQty" :min="0.01" :max="inlineActionItem.quantity" style="width: 100%" />
         </n-form-item>
+        <n-form-item v-if="inlineBatchOptions.length > 0" label="选择批次 (FIFO)">
+          <n-select
+            v-model:value="inlineConsumeBatchId"
+            :options="inlineBatchOptions"
+            clearable
+            placeholder="自动按FIFO消耗"
+            style="width: 100%"
+          />
+        </n-form-item>
       </div>
       <template #footer>
         <n-space justify="end">
@@ -667,6 +696,7 @@ import {
   NModal, NInputNumber, NSpin, NAlert, NCollapseTransition,
   NTag, NIcon, NProgress, NCard, NGrid, NGi, NCheckbox,
   NPopover, NSpace, NFormItem, NDropdown, NTooltip, NRadio,
+  NDatePicker,
   useMessage, useDialog,
 } from 'naive-ui';
 import type { DataTableColumns, DataTableRowData } from 'naive-ui';
@@ -864,6 +894,8 @@ const showInlineStockInModal = ref(false);
 const showInlineConsumeModal = ref(false);
 const inlineStockInQty = ref(1);
 const inlineConsumeQty = ref(1);
+const inlineConsumeBatchId = ref<number | null>(null);
+const inlineBatchOptions = ref<Array<{ label: string; value: number; qty: number }>>([]);
 
 // ── Audit State ──
 const auditActive = ref(false);
@@ -891,6 +923,8 @@ const quickStockInPrice = ref(0);
 const quickStockInLocationId = ref<number | null>(null);
 const quickStockInNote = ref('');
 const quickStockInConfirming = ref(false);
+const quickStockInBatchNumber = ref('');
+const quickStockInExpiryDate = ref<number | null>(null);
 const locations = ref<Location[]>([]);
 
 // ── Data ──
@@ -922,6 +956,11 @@ const categoryOptions = computed(() =>
 const locationOptions = computed(() =>
   locations.value.map(l => ({ label: l.name, value: l.id }))
 );
+
+const importExportOptions = [
+  { label: '导出 CSV', key: 'export-csv' },
+  { label: '导入 CSV', key: 'import-csv' },
+];
 
 
 const statusFilterOptions = computed(() => [
@@ -1077,6 +1116,25 @@ function confirmQuickConsume(item: Item) {
   });
 }
 
+async function openConsumeModal(item: Item) {
+  inlineActionItem.value = item;
+  inlineConsumeQty.value = 1;
+  inlineConsumeBatchId.value = null;
+  // Load batch options
+  try {
+    const res = await stockApi.getBatchSummary(item.id);
+    const batches = (res.data || []) as Array<{ id: number; batchNumber: string; quantity: number; unit: string; daysUntilExpiry: number | null }>;
+    inlineBatchOptions.value = batches.map((b) => ({
+      label: `${b.batchNumber || '批次#' + b.id} (${b.quantity}${b.unit}${b.daysUntilExpiry !== null ? ', ' + b.daysUntilExpiry + '天' : ''})`,
+      value: b.id,
+      qty: b.quantity,
+    }));
+  } catch {
+    inlineBatchOptions.value = [];
+  }
+  showInlineConsumeModal.value = true;
+}
+
 function confirmMarkOpened(item: Item) {
   dialog.info({
     title: '标记已开',
@@ -1108,7 +1166,10 @@ async function confirmInlineStockIn() {
 async function confirmInlineConsume() {
   if (!inlineActionItem.value) return;
   try {
-    await stockApi.consume(inlineActionItem.value.id, { quantity: inlineConsumeQty.value });
+    await stockApi.consume(inlineActionItem.value.id, {
+      quantity: inlineConsumeQty.value,
+      batchId: inlineConsumeBatchId.value || undefined,
+    });
     message.success(`消耗 ${inlineConsumeQty.value} ${inlineActionItem.value.unit}`);
     showInlineConsumeModal.value = false;
     stockStore.fetchItems();
@@ -1398,9 +1459,7 @@ function getMoreActions(item: Item) {
 function handleMoreAction(key: string, item: Item) {
   switch (key) {
     case 'consume-custom':
-      inlineActionItem.value = item;
-      inlineConsumeQty.value = 1;
-      showInlineConsumeModal.value = true;
+      openConsumeModal(item);
       break;
     case 'transfer':
     case 'adjust':
@@ -1475,6 +1534,8 @@ function openQuickStockIn() {
   quickStockInPrice.value = 0;
   quickStockInLocationId.value = null;
   quickStockInNote.value = '';
+  quickStockInBatchNumber.value = '';
+  quickStockInExpiryDate.value = null;
   showQuickStockInModal.value = true;
 }
 
@@ -1513,17 +1574,36 @@ async function handleQuickStockInConfirm() {
   if (!quickStockInSelectedProduct.value || !quickStockInQuantity.value) return;
   quickStockInConfirming.value = true;
   try {
-    const payload: Record<string, unknown> = {
-      name: quickStockInSelectedProduct.value.name,
-      productId: quickStockInSelectedProduct.value.id,
-      unit: quickStockInSelectedProduct.value.unit || '个',
-      type: 'generic',
-      quantity: quickStockInQuantity.value,
-      purchasePrice: quickStockInPrice.value || undefined,
-      locationId: quickStockInLocationId.value || undefined,
-      notes: quickStockInNote.value || undefined,
-    };
-    await stockApi.create(payload);
+    // First check if item already exists, if so use stock-in endpoint
+    const existingItem = stockStore.items.find(
+      (i: Item) => i.name === quickStockInSelectedProduct.value!.name || i.barcode === quickStockInSelectedProduct.value!.barcode
+    );
+
+    if (existingItem) {
+      // Use stock-in endpoint for existing items
+      await stockApi.stockIn(existingItem.id, {
+        quantity: quickStockInQuantity.value,
+        price: quickStockInPrice.value || undefined,
+        note: quickStockInNote.value || undefined,
+        batchNumber: quickStockInBatchNumber.value || undefined,
+        expiryDate: quickStockInExpiryDate.value || undefined,
+        locationId: quickStockInLocationId.value || undefined,
+      });
+    } else {
+      // Create new item
+      const payload: Record<string, unknown> = {
+        name: quickStockInSelectedProduct.value.name,
+        productId: quickStockInSelectedProduct.value.id,
+        unit: quickStockInSelectedProduct.value.unit || '个',
+        type: 'generic',
+        quantity: quickStockInQuantity.value,
+        purchasePrice: quickStockInPrice.value || undefined,
+        locationId: quickStockInLocationId.value || undefined,
+        notes: quickStockInNote.value || undefined,
+        expiryDate: quickStockInExpiryDate.value || undefined,
+      };
+      await stockApi.create(payload);
+    }
     message.success('入库成功');
     showQuickStockInModal.value = false;
     await stockStore.fetchItems();
@@ -1614,16 +1694,95 @@ function confirmCompleteAudit() {
       : t('stock.completeInventoryMsg'),
     positiveText: t('stock.completeInventory'),
     negativeText: t('common.cancel'),
-    onPositiveClick: () => {
-      message.success(t('stock.inventoryComplete', { total: stockStore.items.length, diff: disc }));
+    onPositiveClick: async () => {
+      // Find items with discrepancies and call adjust API
+      const discrepancies: Array<{ item: Item; actual: number }> = [];
+      for (const item of stockStore.items) {
+        const actual = getAuditActualQty(item.id);
+        if (actual !== null && actual !== item.quantity) {
+          discrepancies.push({ item, actual });
+        }
+      }
+
+      if (discrepancies.length > 0) {
+        let adjustedCount = 0;
+        for (const { item, actual } of discrepancies) {
+          try {
+            await stockApi.adjust(item.id, {
+              quantity: actual,
+              note: `盘点调整 (系统: ${item.quantity}, 实际: ${actual})`,
+            });
+            adjustedCount++;
+          } catch {
+            // Continue with next item
+          }
+        }
+        if (adjustedCount > 0) {
+          message.success(`已调整 ${adjustedCount} 个物品`);
+        }
+      } else {
+        message.success(t('stock.inventoryComplete', { total: stockStore.items.length, diff: disc }));
+      }
+
       auditActive.value = false;
       auditActualQtyMap.value = new Map();
+      stockStore.fetchItems();
     },
   });
 }
 
 // ── Existing Methods ──
 const isExpired = (item: Item): boolean => item.expiryDate ? new Date(item.expiryDate) < new Date() : false;
+
+async function handleImportExport(key: string) {
+  if (key === 'export-csv') {
+    try {
+      const res = await stockApi.exportCsv();
+      const blob = new Blob([res.data], { type: 'text/csv;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `homehub-stock-${new Date().toISOString().split('T')[0]}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      message.success('导出成功');
+    } catch {
+      message.error('导出失败');
+    }
+  } else if (key === 'import-csv') {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.csv';
+    input.onchange = async (e: Event) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      try {
+        const text = await file.text();
+        const lines = text.split('\n').filter(l => l.trim());
+        if (lines.length < 2) {
+          message.error('CSV 文件为空或格式错误');
+          return;
+        }
+        const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
+        const items: Partial<Item>[] = [];
+        for (let i = 1; i < lines.length; i++) {
+          const values = lines[i].split(',').map(v => v.trim().replace(/"/g, ''));
+          const item: Record<string, any> = {};
+          headers.forEach((h, idx) => {
+            item[h] = values[idx] || '';
+          });
+          items.push(item as Partial<Item>);
+        }
+        const res = await stockApi.importCsv({ invItems: items });
+        message.success(`导入完成: ${(res.data as any).imported} 成功, ${(res.data as any).failed} 失败`);
+        stockStore.fetchItems();
+      } catch {
+        message.error('导入失败');
+      }
+    };
+    input.click();
+  }
+}
 const isExpiring = (item: Item): boolean => {
   if (!item.expiryDate) return false;
   const d = new Date(item.expiryDate);

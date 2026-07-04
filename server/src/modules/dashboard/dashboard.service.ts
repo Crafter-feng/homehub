@@ -127,18 +127,11 @@ export class DashboardService {
   }
 
   async getWasteAnalysis(familyId: number) {
-    // Waste keywords to match in notes (Chinese + English)
-    const wasteKeywords = ['过期', '浪费', '废弃', '损坏', '变质', 'expired', 'waste', 'spoiled', 'damaged'];
-
-    // Build LIKE conditions for waste notes
-    const wasteConditions = wasteKeywords.map(keyword =>
-      like(invStockTransactions.note, `%${keyword}%`)
-    );
-
-    // Fetch waste transactions: type='consume' with waste-indicating notes
+    // Query transactions with spoiled > 0 (structured waste tracking)
     const wasteTxs = await this.db.select({
       id: invStockTransactions.id,
       quantity: invStockTransactions.quantity,
+      spoiled: invStockTransactions.spoiled,
       unit: invStockTransactions.unit,
       note: invStockTransactions.note,
       createdAt: invStockTransactions.createdAt,
@@ -151,15 +144,25 @@ export class DashboardService {
       .where(and(
         eq(invItems.familyId, familyId),
         eq(invStockTransactions.type, 'consume'),
-        ...wasteConditions,
+        sql`${invStockTransactions.spoiled} > 0`,
       ))
       .orderBy(desc(invStockTransactions.createdAt));
 
-    // totalWasted: sum of quantity
-    const totalWasted = wasteTxs.reduce((sum: number, tx: any) => sum + Math.abs(tx.quantity), 0);
+    // totalWasted: sum of spoiled quantity
+    const totalWasted = wasteTxs.reduce((sum: number, tx: any) => sum + (tx.spoiled || 0), 0);
 
-    // wastedByCategory: group by category
-    // First get category names
+    // Get total consumed for spoil rate calculation
+    const totalConsumed = await this.db.select({ total: sql<number>`coalesce(sum(${invStockTransactions.quantity}), 0)` })
+      .from(invStockTransactions)
+      .innerJoin(invItems, eq(invStockTransactions.itemId, invItems.id))
+      .where(and(
+        eq(invItems.familyId, familyId),
+        eq(invStockTransactions.type, 'consume'),
+      )).get();
+
+    const spoilRate = totalConsumed?.total > 0 ? (totalWasted / totalConsumed.total) * 100 : 0;
+
+    // wastedByCategory
     const categoryIdSet = new Set(wasteTxs.map((tx: any) => tx.categoryId).filter(Boolean));
     const categoryIds: number[] = Array.from(categoryIdSet) as number[];
     let categoryMap: Record<number, string> = {};
@@ -178,7 +181,7 @@ export class DashboardService {
     const wastedByCategoryMap: Record<string, number> = {};
     for (const tx of wasteTxs) {
       const catName = tx.categoryId ? (categoryMap[tx.categoryId] || '未分类') : '未分类';
-      wastedByCategoryMap[catName] = (wastedByCategoryMap[catName] || 0) + Math.abs(tx.quantity);
+      wastedByCategoryMap[catName] = (wastedByCategoryMap[catName] || 0) + (tx.spoiled || 0);
     }
 
     // monthlyTrend: past 12 months
@@ -191,17 +194,17 @@ export class DashboardService {
       const monthEnd = new Date(d.getFullYear(), d.getMonth() + 1, 1).getTime();
       const monthQuantity = wasteTxs
         .filter((tx: any) => tx.createdAt && tx.createdAt.getTime() >= monthStart && tx.createdAt.getTime() < monthEnd)
-        .reduce((sum: number, tx: any) => sum + Math.abs(tx.quantity), 0);
+        .reduce((sum: number, tx: any) => sum + (tx.spoiled || 0), 0);
       monthlyTrend.push({ month: monthStr, quantity: Math.round(monthQuantity * 100) / 100 });
     }
 
-    // topWastedItems: top 5 by quantity
+    // topWastedItems: top 5 by spoiled quantity
     const itemMap: Record<number, { name: string; quantity: number; unit: string }> = {};
     for (const tx of wasteTxs) {
       if (!itemMap[tx.itemId]) {
         itemMap[tx.itemId] = { name: tx.itemName || '未知', quantity: 0, unit: tx.unit || '' };
       }
-      itemMap[tx.itemId].quantity += Math.abs(tx.quantity);
+      itemMap[tx.itemId].quantity += (tx.spoiled || 0);
     }
     const topWastedItems = Object.entries(itemMap)
       .sort(([, a], [, b]) => b.quantity - a.quantity)
@@ -213,15 +216,16 @@ export class DashboardService {
         unit: data.unit,
       }));
 
-    // estimatedLoss: total purchasePrice of wasted invItems
+    // estimatedLoss
     const estimatedLoss = wasteTxs.reduce((sum: number, tx: any) => {
       const price = tx.purchasePrice || 0;
-      const qty = Math.abs(tx.quantity);
+      const qty = tx.spoiled || 0;
       return sum + price * qty;
     }, 0);
 
     return {
       totalWasted: Math.round(totalWasted * 100) / 100,
+      spoilRate: Math.round(spoilRate * 100) / 100,
       wastedByCategory: Object.entries(wastedByCategoryMap).map(([category, quantity]) => ({
         category,
         quantity: Math.round(quantity * 100) / 100,

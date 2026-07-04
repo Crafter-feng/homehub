@@ -15,7 +15,8 @@
     "db:migrate": "drizzle-kit migrate",
     "db:seed": "tsx scripts/seed.ts",
     "db:studio": "drizzle-kit studio",
-    "migrate:grocy": "tsx scripts/migrate-grocy.ts"
+    "migrate:grocy": "tsx scripts/migrate-grocy.ts",
+    "backfill:batches": "tsx scripts/backfill-batches.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.0",

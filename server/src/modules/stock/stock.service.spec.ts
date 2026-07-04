@@ -8,21 +8,28 @@ class MockRegistry {
   getItemTypeConfig() { return null; }
 }
 
+// Mock for ListsService
+class MockListsService {
+  async autoReplenish() { return { added: 0, message: 'mock' }; }
+}
+
 let module: any;
 let service: StockService;
 
 beforeAll(async () => {
-  // We use a string token since importing the real class adds heavy deps
   const ctx = await createTestModule([
     StockService,
     { provide: 'PluginRegistryService', useClass: MockRegistry },
+    { provide: 'ListsService', useClass: MockListsService },
   ]);
   module = ctx.module;
   service = module.get(StockService);
 
-  // Patch the registry after module init (since StockService injects by class token)
+  // Patch the registry after module init
   // @ts-ignore - directly set the private property
   service['registry'] = new MockRegistry();
+  // @ts-ignore
+  service['listsService'] = new MockListsService();
 });
 
 afterAll(() => {

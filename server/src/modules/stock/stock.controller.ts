@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Put, Delete, Body, Param, Query, Request, UseGuards, Res } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { StockService } from './stock.service';
-import { CreateItemDto, UpdateItemDto, ConsumeItemDto, TransferItemDto, AdjustItemDto, StockInItemDto, CreateBatchDto } from './dto/stock.dto';
+import { CreateItemDto, UpdateItemDto, ConsumeItemDto, TransferItemDto, AdjustItemDto, StockInItemDto, CreateBatchDto, UpdateBatchDto } from './dto/stock.dto';
 import { PaginationQuery } from '../../common';
 import { Response } from 'express';
 
@@ -101,6 +101,28 @@ export class StockController {
   @Get('items/:id/batches')
   listBatches(@Param('id') id: string) {
     return this.stockService.listBatches(parseInt(id));
+  }
+
+  @Get('items/:id/batches/summary')
+  getBatchSummary(@Param('id') id: string) {
+    return this.stockService.getBatchSummary(parseInt(id));
+  }
+
+  @Put('items/batches/:batchId')
+  updateBatch(
+    @Param('batchId') batchId: string,
+    @Request() req: AuthedRequest,
+    @Body() dto: UpdateBatchDto,
+  ) {
+    return this.stockService.editBatch(parseInt(batchId), req.user.familyId, dto);
+  }
+
+  @Delete('items/batches/:batchId')
+  deleteBatch(
+    @Param('batchId') batchId: string,
+    @Request() req: AuthedRequest,
+  ) {
+    return this.stockService.deleteBatch(parseInt(batchId), req.user.familyId);
   }
 
   @Get('export')

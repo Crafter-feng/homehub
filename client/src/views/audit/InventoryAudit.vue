@@ -330,10 +330,31 @@ function confirmComplete() {
   });
 }
 
-function completeAudit() {
-  const total = auditItems.value.length;
-  const diff = discrepancyCount.value;
-  message.success(t('inventoryAudit.auditCompleteDesc', { total, diff }));
+async function completeAudit() {
+  const discrepancies = auditItems.value.filter(item => item.actualQty !== null && item.actualQty !== item.expectedQty);
+
+  if (discrepancies.length > 0) {
+    // Call adjust API for each discrepancy
+    let adjustedCount = 0;
+    let failedCount = 0;
+    for (const item of discrepancies) {
+      try {
+        await stockApi.adjust(item.id, {
+          quantity: item.actualQty!,
+          note: `盘点调整 (系统: ${item.expectedQty}, 实际: ${item.actualQty})`,
+        });
+        adjustedCount++;
+      } catch {
+        failedCount++;
+      }
+    }
+    if (adjustedCount > 0) {
+      message.success(`已调整 ${adjustedCount} 个物品的库存${failedCount > 0 ? `，${failedCount} 个失败` : ''}`);
+    }
+  } else {
+    message.success('盘点完成，无差异');
+  }
+
   auditActive.value = false;
   auditItems.value.forEach(item => {
     item.actualQty = null;

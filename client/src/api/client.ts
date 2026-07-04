@@ -141,9 +141,9 @@ export const stockApi = {
   create: (data: Partial<Item>) => api.post('/stock/items', data),
   update: (id: number, data: Partial<Item>) => api.put(`/stock/items/${id}`, data),
   delete: (id: number) => api.delete(`/stock/items/${id}`),
-  consume: (id: number, data: { quantity: number; note?: string }) =>
+  consume: (id: number, data: { quantity: number; note?: string; batchId?: number; spoiled?: number }) =>
     api.post(`/stock/items/${id}/consume`, data),
-  stockIn: (id: number, data: { quantity: number; note?: string }) =>
+  stockIn: (id: number, data: { quantity: number; note?: string; price?: number; batchNumber?: string; expiryDate?: number; purchaseDate?: number; locationId?: number }) =>
     api.post(`/stock/items/${id}/stock-in`, data),
   transfer: (id: number, data: { toLocationId: number; quantity?: number }) =>
     api.post(`/stock/items/${id}/transfer`, data),
@@ -152,6 +152,15 @@ export const stockApi = {
   getHistory: (id: number) => api.get(`/stock/items/${id}/history`),
   getExpiring: (days?: number) => api.get('/stock/expiring', { params: { days } }),
   getSummary: () => api.get('/stock/summary'),
+  // Batch API
+  listBatches: (itemId: number) => api.get(`/stock/items/${itemId}/batches`),
+  getBatchSummary: (itemId: number) => api.get(`/stock/items/${itemId}/batches/summary`),
+  updateBatch: (batchId: number, data: { batchNumber?: string; quantity?: number; expiryDate?: number; purchaseDate?: number; locationId?: number }) =>
+    api.put(`/stock/items/batches/${batchId}`, data),
+  deleteBatch: (batchId: number) => api.delete(`/stock/items/batches/${batchId}`),
+  // CSV
+  exportCsv: () => api.get('/stock/export', { responseType: 'blob' }),
+  importCsv: (data: { invItems: Array<Partial<Item>> }) => api.post('/stock/import', data),
 };
 
 // === Locations API ===
@@ -414,10 +423,12 @@ export const backupApi = {
 
 // === History API ===
 export const historyApi = {
-  getTimeline: (params?: { page?: number; limit?: number; type?: string; source?: string }) =>
+  getTimeline: (params?: { page?: number; limit?: number; type?: string; source?: string; itemId?: number; userId?: number }) =>
     api.get('/history/timeline', { params }),
   getScanLogs: (limit?: number) =>
     api.get('/history/scan-logs', { params: { limit } }),
+  getJournalSummary: () =>
+    api.get('/history/journal-summary'),
 };
 
 // === Calendar Events API ===

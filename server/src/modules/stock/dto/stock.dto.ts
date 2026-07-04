@@ -80,6 +80,10 @@ export class CreateItemDto {
   @IsOptional()
   expiryDate?: number;
 
+  @IsNumber()
+  @IsOptional()
+  productId?: number;
+
   @IsOptional()
   customFields?: Record<string, unknown>;
 }
@@ -165,6 +169,10 @@ export class UpdateItemDto {
   @IsOptional()
   expiryDate?: number;
 
+  @IsString()
+  @IsOptional()
+  currentState?: string;
+
   @IsOptional()
   customFields?: Record<string, unknown>;
 }
@@ -177,6 +185,50 @@ export class ConsumeItemDto {
   @IsString()
   @IsOptional()
   note?: string;
+
+  @IsNumber()
+  @IsOptional()
+  batchId?: number;
+
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  spoiled?: number;
+}
+
+export class UpdateBatchDto {
+  @IsString()
+  @IsOptional()
+  batchNumber?: string;
+
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  quantity?: number;
+
+  @Transform(({ value }) => {
+    if (value === null || value === undefined) return undefined;
+    if (typeof value === 'number') return value;
+    if (typeof value === 'string') return new Date(value).getTime();
+    return value;
+  })
+  @IsNumber()
+  @IsOptional()
+  expiryDate?: number;
+
+  @Transform(({ value }) => {
+    if (value === null || value === undefined) return undefined;
+    if (typeof value === 'number') return value;
+    if (typeof value === 'string') return new Date(value).getTime();
+    return value;
+  })
+  @IsNumber()
+  @IsOptional()
+  purchaseDate?: number;
+
+  @IsNumber()
+  @IsOptional()
+  locationId?: number;
 }
 
 export class TransferItemDto {
@@ -210,6 +262,38 @@ export class StockInItemDto {
   @IsString()
   @IsOptional()
   note?: string;
+
+  @IsString()
+  @IsOptional()
+  batchNumber?: string;
+
+  @Transform(({ value }) => {
+    if (value === null || value === undefined) return undefined;
+    if (typeof value === 'number') return value;
+    if (typeof value === 'string') return new Date(value).getTime();
+    return value;
+  })
+  @IsNumber()
+  @IsOptional()
+  expiryDate?: number;
+
+  @Transform(({ value }) => {
+    if (value === null || value === undefined) return undefined;
+    if (typeof value === 'number') return value;
+    if (typeof value === 'string') return new Date(value).getTime();
+    return value;
+  })
+  @IsNumber()
+  @IsOptional()
+  purchaseDate?: number;
+
+  @IsNumber()
+  @IsOptional()
+  locationId?: number;
+
+  @IsNumber()
+  @IsOptional()
+  productId?: number;
 }
 
 export class CreateBatchDto {

@@ -4,15 +4,6 @@ import { HistoryService } from './history.service';
 import { TimelineQueryDto } from './dto/history.dto';
 import { PaginationQuery } from '../../common/dto/pagination.dto';
 
-/**
- * ItemHistoryController — REMOVED.
- *
- * This was a duplicate of StockController's GET /stock/invItems/:id/history.
- * All item history access should go through the stock module.
- * The HistoryController (GET /history/timeline) remains for family-level timeline queries.
- */
-// ItemHistoryController removed — use StockController.getItemHistory instead
-
 @Controller('history')
 @UseGuards(JwtAuthGuard)
 export class HistoryController {
@@ -26,6 +17,11 @@ export class HistoryController {
     pagination.sortBy = filters.sortBy;
     pagination.sortOrder = filters.sortOrder ?? 'desc';
     return this.historyService.getFamilyTimeline(req.user.familyId, filters, pagination);
+  }
+
+  @Get('journal-summary')
+  getJournalSummary(@Request() req: any) {
+    return this.historyService.getJournalSummary(req.user.familyId);
   }
 
   @Get('scan-logs')
