@@ -194,7 +194,7 @@
       <n-spin :show="stockStore.loading">
         <n-grid :cols="3" :x-gap="16" :y-gap="16">
           <n-gi v-for="item in filteredItems" :key="item.id">
-            <n-card class="stock-card hover-card" @click="auditActive ? null : $router.push(`/stock/${item.id}`)">
+            <n-card class="stock-card hover-card" @click="auditActive ? null : openItemDetail(item.id)">
               <template #header>
                 <div class="stock-card-header">
                   <span class="stock-card-name">{{ item.name }}</span>
@@ -399,18 +399,24 @@
       v-model:visible="showProductFormDialog"
       @saved="onProductCreated"
     />
+
+    <ItemDetailModal
+      v-model:show="showItemDetail"
+      :item-id="selectedItemId"
+      @deleted="onItemDeleted"
+      @updated="onItemUpdated"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, h } from 'vue';
 import {
-  NButton, NButtonGroup, NSpace, NInput, NSelect, NDataTable,
+  NButton, NButtonGroup, NInput, NSelect, NDataTable,
   NModal, NInputNumber, NSpin, NAlert, NCollapseTransition,
   NTag, NIcon, NProgress, NCard, NGrid, NGi, useMessage, useDialog,
 } from 'naive-ui';
 import type { DataTableColumns } from 'naive-ui';
-import { useRouter } from 'vue-router';
 import { useStockStore } from '@/stores/stock.store';
 import { useI18n } from '@/locales';
 import { stockApi, locationsApi, unitsApi, productsApi } from '@/api/client';
@@ -418,7 +424,7 @@ import api from '@/api/client';
 import type { Category, Location, Item } from '@/shared/types';
 import {
   AddOutline, SearchOutline, ListOutline, GridOutline, LocationOutline,
-  CreateOutline, TrashOutline, CheckmarkOutline,
+  CheckmarkOutline,
   CubeOutline, WarningOutline, AlertCircleOutline,
   ClipboardOutline, CloseOutline, CheckmarkCircleOutline,
   ArrowDownOutline, ScanOutline,
@@ -426,6 +432,7 @@ import {
 } from '@vicons/ionicons5';
 import { getCategoryColor } from '@/utils/format';
 import ProductFormDialog from '@/components/ProductFormDialog.vue';
+import ItemDetailModal from '@/components/ItemDetailModal.vue';
 import { clientRegistry } from '@/plugins/client-registry';
 import type { ScanResult } from '@/plugins/types/client-plugin.types';
 
@@ -434,7 +441,6 @@ type ViewMode = 'table' | 'card';
 
 const message = useMessage();
 const dialog = useDialog();
-const router = useRouter();
 const stockStore = useStockStore();
 const { t } = useI18n();
 
@@ -444,6 +450,8 @@ const filterCategory = ref<string | null>(null);
 const filterLocation = ref<string | null>(null);
 const filterStatus = ref<string | null>(null);
 const viewMode = ref<ViewMode>('table');
+const showItemDetail = ref(false);
+const selectedItemId = ref<number | null>(null);
 
 // ── Audit State ──
 const auditActive = ref(false);
@@ -570,6 +578,21 @@ const progressPercent = computed(() => {
   if (stockStore.items.length === 0) return 0;
   return Math.round((countedCount.value / stockStore.items.length) * 100);
 });
+
+// ── Item Detail Modal ──
+function openItemDetail(itemId: number) {
+  selectedItemId.value = itemId;
+  showItemDetail.value = true;
+}
+
+function onItemDeleted() {
+  showItemDetail.value = false;
+  stockStore.fetchItems();
+}
+
+function onItemUpdated() {
+  stockStore.fetchItems();
+}
 
 // ── Quick Stock In Methods ──
 function openQuickStockIn() {
@@ -730,37 +753,21 @@ function confirmCompleteAudit() {
 
 // ── Table Columns ──
 const normalTableColumns: DataTableColumns<Item> = [
-  { title: t('stock.name'), key: 'name', render: (row) => h('span', { style: 'font-weight: 500' }, row.name) },
-  { title: t('stock.quantity'), key: 'quantity', width: 90, render: (row) => h('span', {}, `${row.quantity} ${row.unit}`) },
-  { title: '单价', key: 'purchasePrice', width: 100, align: 'right', render: (row) => {
-    if (!row.purchasePrice) return h('span', { style: 'color: var(--hh-text-tertiary)' }, '-');
-    return h('span', { style: 'font-weight: 500; color: var(--hh-success)' }, `¥${row.purchasePrice}`);
+  { title: t('stock.name'), key: 'name', minWidth: 150, ellipsis: { tooltip: true }, render: (row) => h('span', { style: 'font-weight: 500' }, row.name) },
+  { title: t('stock.quantity'), key: 'quantity', width: 80, render: (row) => h('span', {}, `${row.quantity} ${row.unit}`) },
+  { title: t('stock.category'), key: 'type', width: 80, render: (row) => h(NTag as any, { size: 'small', round: true, bordered: false, type: getCategoryColor(row.type) }, { default: () => row.type }) },
+  { title: '位置', key: 'locationId', width: 90, render: (row) => {
+    return h('span', {}, getLocationName(row.locationId));
   }},
-  { title: '小计', key: 'subtotal', width: 100, align: 'right', render: (row) => {
-    if (!row.purchasePrice) return '-';
-    const subtotal = (row.quantity || 0) * row.purchasePrice;
-    return h('span', { style: 'font-weight: 600' }, `¥${subtotal.toFixed(2)}`);
-  }},
-  { title: '品牌', key: 'brand', width: 90, render: (row) => {
-    if (!row.brand) return h('span', { style: 'color: var(--hh-text-tertiary)' }, '-');
-    return h('span', {}, row.brand);
-  }},
-  { title: '商店', key: 'shop', width: 90, render: (row) => {
-    if (!row.shop) return h('span', { style: 'color: var(--hh-text-tertiary)' }, '-');
-    return h('span', {}, row.shop);
-  }},
-  { title: t('stock.category'), key: 'type', width: 100, render: (row) => h(NTag as any, { size: 'small', round: true, bordered: false, type: getCategoryColor(row.type) }, { default: () => row.type }) },
-  { title: t('stock.expiryDate'), key: 'expiryDate', width: 110, render: (row) => {
+  { title: t('stock.expiryDate'), key: 'expiryDate', width: 100, render: (row) => {
     if (!row.expiryDate) return '-';
     const isExp = new Date(row.expiryDate) < new Date();
     return h('span', { style: isExp ? { color: 'var(--hh-error)' } : {} }, new Date(row.expiryDate).toLocaleDateString());
   }},
-  { title: t('common.edit'), key: 'actions', width: 80, align: 'center', render: (row) => h(NSpace as any, { size: 4, align: 'center' }, {
-    default: () => [
-      h(NButton as any, { size: 'tiny', quaternary: true, type: 'primary', onClick: () => handleConsume(row) }, { icon: () => h(NIcon as any, { size: 16 }, { default: () => h(CreateOutline) }) }),
-      h(NButton as any, { size: 'tiny', quaternary: true, type: 'error', onClick: () => handleDeleteItem(row) }, { icon: () => h(NIcon as any, { size: 16 }, { default: () => h(TrashOutline) }) }),
-    ],
-  })},
+  { title: '品牌', key: 'brand', width: 80, render: (row) => {
+    if (!row.brand) return h('span', { style: 'color: var(--hh-text-tertiary)' }, '-');
+    return h('span', {}, row.brand);
+  }},
 ];
 
 const auditTableColumns: DataTableColumns<Item> = [
@@ -805,23 +812,7 @@ const getLocationName = (locationId: number | null): string => {
   return loc ? loc.name : String(locationId);
 };
 
-const rowProps = (row: Item) => auditActive.value ? {} : { style: 'cursor: pointer;', onClick: () => router.push({ name: 'stock-detail', params: { id: row.id } }) };
-
-const handleConsume = async (item: Item) => {
-  try { await stockStore.consumeItem(item.id, 1); message.success(t('stock.consumeSuccess')); }
-  catch (e: unknown) { const err = e as { response?: { data?: { message?: string } } }; message.error(err.response?.data?.message || t('common.error')); }
-};
-
-const handleDeleteItem = (item: Item) => {
-  dialog.warning({
-    title: '确认删除', content: `确定要删除「${item.name}」吗？此操作不可撤销。`,
-    positiveText: '删除', negativeText: '取消',
-    onPositiveClick: async () => {
-      try { await stockStore.deleteItem(item.id); message.success('删除成功'); }
-      catch (e: unknown) { const err = e as { response?: { data?: { message?: string } } }; message.error(err.response?.data?.message || '删除失败'); }
-    },
-  });
-};
+const rowProps = (row: Item) => auditActive.value ? {} : { style: 'cursor: pointer;', onClick: () => openItemDetail(row.id) };
 
 onMounted(async () => {
   try { await stockStore.fetchItems(); } catch (_e: unknown) {}
@@ -908,7 +899,7 @@ onMounted(async () => {
 .stock-card-footer { display: flex; align-items: center; gap: var(--hh-space-1); font-size: var(--hh-text-xs); color: var(--hh-text-tertiary); margin-top: var(--hh-space-2); }
 
 /* Table View */
-.table-view { background: var(--hh-bg-card); border-radius: var(--hh-radius); border: 1px solid var(--hh-border-light); box-shadow: var(--hh-shadow-sm); padding: var(--hh-space-3); }
+.table-view { background: var(--hh-bg-card); border-radius: var(--hh-radius); border: 1px solid var(--hh-border-light); box-shadow: var(--hh-shadow-sm); padding: var(--hh-space-3); overflow-x: auto; }
 
 /* Empty Stock */
 .empty-stock-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: var(--hh-space-8) var(--hh-space-4); text-align: center; gap: var(--hh-space-4); }
