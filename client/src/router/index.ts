@@ -13,6 +13,8 @@ const router = createRouter({
         { path: '', redirect: '/dashboard' },
         { path: 'dashboard', name: 'dashboard', component: () => import('@/views/dashboard/Dashboard.vue') },
         { path: 'waste-analysis', name: 'waste-analysis', component: () => import('@/views/dashboard/WasteAnalysis.vue') },
+        { path: 'spending-report', name: 'spending-report', component: () => import('@/views/dashboard/SpendingReport.vue') },
+        { path: 'location-report', name: 'location-report', component: () => import('@/views/dashboard/LocationReport.vue') },
         { path: 'stock', name: 'stock', component: () => import('@/views/stock/StockList.vue') },
         { path: 'stock/:id', name: 'stock-detail', component: () => import('@/views/stock/ItemDetail.vue') },
         { path: 'lists', name: 'lists', component: () => import('@/views/shopping-list/ListsView.vue') },

@@ -27,4 +27,18 @@ export class DashboardController {
   getWasteAnalysis(@Request() req: any) {
     return this.dashboardService.getWasteAnalysis(req.user.familyId);
   }
+
+  @Get('spending-report')
+  getSpendingReport(
+    @Request() req: any,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.dashboardService.getSpendingReport(req.user.familyId, startDate, endDate);
+  }
+
+  @Get('location-report')
+  getLocationReport(@Request() req: any) {
+    return this.dashboardService.getLocationReport(req.user.familyId);
+  }
 }

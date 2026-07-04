@@ -388,6 +388,9 @@ export const dashboardApi = {
   getActivities: (limit?: number) => api.get('/dashboard/activities', { params: { limit } }),
   getSummary: () => api.get('/dashboard/summary'),
   getWasteAnalysis: () => api.get('/dashboard/waste-analysis'),
+  getSpendingReport: (startDate?: string, endDate?: string) =>
+    api.get('/dashboard/spending-report', { params: { startDate, endDate } }),
+  getLocationReport: () => api.get('/dashboard/location-report'),
 };
 
 // === Budget API ===

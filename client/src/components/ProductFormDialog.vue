@@ -44,6 +44,20 @@
         </div>
         <img v-if="form.image" :src="form.image" class="pfd-image-preview" />
       </div>
+      <div class="pfd-grid">
+        <div class="pfd-row">
+          <label class="pfd-label">默认保质期 (天)</label>
+          <n-input-number v-model:value="form.defaultBestBeforeDays" :min="0" placeholder="可选" size="large" style="width: 100%">
+            <template #suffix>天</template>
+          </n-input-number>
+        </div>
+        <div class="pfd-row">
+          <label class="pfd-label">开封后保质期 (天)</label>
+          <n-input-number v-model:value="form.defaultBestBeforeDaysAfterOpen" :min="0" placeholder="可选" size="large" style="width: 100%">
+            <template #suffix>天</template>
+          </n-input-number>
+        </div>
+      </div>
       <div class="pfd-row">
         <label class="pfd-label">备注</label>
         <n-input v-model:value="form.notes" type="textarea" placeholder="可选" :rows="2" />
@@ -101,6 +115,8 @@ const form = reactive({
   brand: '',
   image: '',
   defaultPrice: null as number | null,
+  defaultBestBeforeDays: null as number | null,
+  defaultBestBeforeDaysAfterOpen: null as number | null,
   notes: '',
 });
 
@@ -134,6 +150,8 @@ watch(() => props.visible, async (val) => {
     form.brand = props.product?.brand || '';
     form.image = props.product?.image || '';
     form.defaultPrice = props.product?.defaultPrice || null;
+    form.defaultBestBeforeDays = props.product?.defaultBestBeforeDays || null;
+    form.defaultBestBeforeDaysAfterOpen = props.product?.defaultBestBeforeDaysAfterOpen || null;
     form.notes = props.product?.notes || '';
     try {
       const [catRes, unitRes, brandRes] = await Promise.all([
@@ -164,6 +182,8 @@ async function save() {
       brand: form.brand || undefined,
       image: form.image || undefined,
       defaultPrice: form.defaultPrice || undefined,
+      defaultBestBeforeDays: form.defaultBestBeforeDays || undefined,
+      defaultBestBeforeDaysAfterOpen: form.defaultBestBeforeDaysAfterOpen || undefined,
       notes: form.notes || undefined,
     };
     let res;
