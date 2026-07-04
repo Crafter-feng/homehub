@@ -56,19 +56,22 @@ async function bootstrap() {
   }
 
   if (existsSync(clientDistPath)) {
-    const httpAdapter = app.getHttpAdapter().getInstance();
-    httpAdapter.use(express.static(clientDistPath));
-
-    // SPA fallback：非 API/非 uploads 的 GET 请求返回 index.html
-    httpAdapter.get('*', (req: express.Request, res: express.Response) => {
+    // SPA fallback using NestJS middleware approach (compatible with Express 5)
+    app.use((req: any, res: any, next: any) => {
+      if (req.method !== 'GET') return next();
       if (
         req.path.startsWith('/api/') ||
         req.path.startsWith('/mcp') ||
         req.path.startsWith('/uploads')
       ) {
-        return res.status(404).end();
+        return next();
       }
-      res.sendFile(join(clientDistPath, 'index.html'));
+      // Only serve index.html for HTML requests (not assets)
+      if (req.accepts('html')) {
+        res.sendFile(join(clientDistPath, 'index.html'));
+      } else {
+        next();
+      }
     });
 
     logger.log(`静态文件托管: ${clientDistPath}`);
