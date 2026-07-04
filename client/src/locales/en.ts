@@ -228,6 +228,7 @@ export default {
     transferSuccess: 'Item transferred',
     adjustSuccess: 'Quantity adjusted',
     scanStockIn: 'Scan Stock-in',
+    stockIn: 'Stock In',
     stockInQuantity: 'Stock-in Quantity',
     confirmStockIn: 'Confirm Stock-in',
     stockInAndCreate: 'Create & Stock In',

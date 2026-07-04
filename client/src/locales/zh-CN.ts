@@ -228,6 +228,7 @@ export default {
     transferSuccess: '转移成功',
     adjustSuccess: '调整成功',
     scanStockIn: '扫码入库',
+    stockIn: '入库',
     stockInQuantity: '入库数量',
     confirmStockIn: '确认入库',
     stockInAndCreate: '创建并入库',

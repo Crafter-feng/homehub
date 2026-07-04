@@ -4,14 +4,13 @@
 
 import Database from 'better-sqlite3';
 
-// ── Grocy 实体类型 ──
-
 export interface GrocyUser {
   id: number;
   username: string;
   password: string;
   first_name: string;
   last_name: string;
+  picture_file_name: string | null;
   row_created_timestamp: string;
 }
 
@@ -19,6 +18,8 @@ export interface GrocyLocation {
   id: number;
   name: string;
   description: string;
+  is_freezer: number;
+  active: number;
   row_created_timestamp: string;
 }
 
@@ -26,6 +27,25 @@ export interface GrocyQuantityUnit {
   id: number;
   name: string;
   description: string;
+  name_plural: string | null;
+  plural_forms: string | null;
+  active: number;
+  row_created_timestamp: string;
+}
+
+export interface GrocyProductGroup {
+  id: number;
+  name: string;
+  description: string;
+  active: number;
+  row_created_timestamp: string;
+}
+
+export interface GrocyShop {
+  id: number;
+  name: string;
+  description: string;
+  active: number;
   row_created_timestamp: string;
 }
 
@@ -33,14 +53,29 @@ export interface GrocyProduct {
   id: number;
   name: string;
   description: string;
+  product_group_id: number;
+  active: number;
   location_id: number;
+  shopping_location_id: number;
   qu_id_purchase: number;
   qu_id_stock: number;
-  qu_factor_purchase_to_stock: number;
-  barcode: string;
   min_stock_amount: number;
   default_best_before_days: number;
+  parent_product_id: number;
+  calories: number;
   row_created_timestamp: string;
+}
+
+export interface GrocyProductBarcode {
+  id: number;
+  product_id: number;
+  barcode: string;
+  qu_id: number;
+  amount: number;
+  shopping_location_id: number;
+  last_price: number;
+  row_created_timestamp: string;
+  note: string;
 }
 
 export interface GrocyStock {
@@ -49,7 +84,13 @@ export interface GrocyStock {
   amount: number;
   best_before_date: string;
   purchased_date: string;
+  location_id: number;
   stock_id: string;
+  price: number;
+  open: number;
+  opened_date: string;
+  shopping_location_id: number;
+  note: string;
   row_created_timestamp: string;
 }
 
@@ -63,14 +104,23 @@ export interface GrocyStockLog {
   spoiled: number;
   stock_id: string;
   transaction_type: string;
+  price: number;
+  undone: number;
+  location_id: number;
+  recipe_id: number;
+  user_id: number;
+  note: string;
   row_created_timestamp: string;
 }
 
-export interface GrocyShoppingListItem {
+export interface GrocyShoppingList {
   id: number;
   product_id: number;
+  note: string;
   amount: number;
-  amount_autoadded: number;
+  shopping_list_id: number;
+  done: number;
+  qu_id: number;
   row_created_timestamp: string;
 }
 
@@ -78,10 +128,11 @@ export interface GrocyRecipe {
   id: number;
   name: string;
   description: string;
+  picture_file_name: string;
   base_servings: number;
-  prep_time_minutes: number;
-  cook_time_minutes: number;
-  image: string;
+  desired_servings: number;
+  type: string;
+  product_id: number;
   row_created_timestamp: string;
 }
 
@@ -90,9 +141,10 @@ export interface GrocyRecipePosition {
   recipe_id: number;
   product_id: number;
   amount: number;
-  qu_id: number;
-  variable_amount: number;
   note: string;
+  qu_id: number;
+  ingredient_group: string;
+  variable_amount: string;
   row_created_timestamp: string;
 }
 
@@ -102,9 +154,18 @@ export interface GrocyChore {
   description: string;
   period_type: string;
   period_days: number;
-  consume_stock_on_execution: number;
-  consume_stock_product_id: number;
-  consume_stock_quantity_unit_id: number;
+  period_interval: number;
+  period_config: string;
+  track_date_only: number;
+  rollover: number;
+  assignment_type: string;
+  assignment_config: string;
+  next_execution_assigned_to_user_id: number;
+  consume_product_on_execution: number;
+  product_id: number;
+  product_amount: number;
+  active: number;
+  start_date: string;
   row_created_timestamp: string;
 }
 
@@ -112,157 +173,102 @@ export interface GrocyChoreLog {
   id: number;
   chore_id: number;
   tracked_time: string;
-  execution_type: string;
+  done_by_user_id: number;
+  undone: number;
+  skipped: number;
+  scheduled_execution_time: string;
   row_created_timestamp: string;
 }
-
-// ── Grocy 数据库读取器 ──
 
 export class GrocyReader {
   private db: Database.Database;
 
   constructor(dbPath: string) {
     this.db = new Database(dbPath, { readonly: true });
-    this.db.pragma('journal_mode = WAL');
   }
 
-  /** 获取数据库中所有表名 */
   getTableNames(): string[] {
-    const rows = this.db
-      .prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
-      .all() as { name: string }[];
-    return rows.map((r) => r.name);
+    return (this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").all() as { name: string }[]).map(r => r.name);
   }
 
-  /** 检查某张表是否存在 */
   hasTable(tableName: string): boolean {
-    const row = this.db
-      .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name = ?")
-      .get(tableName) as { name: string } | undefined;
-    return !!row;
+    return !!this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name = ?").get(tableName);
   }
 
-  /** 获取某张表的列名 */
   getColumns(tableName: string): string[] {
-    const rows = this.db.prepare(`PRAGMA table_info("${tableName}")`).all() as { name: string }[];
-    return rows.map((r) => r.name);
+    return (this.db.prepare(`PRAGMA table_info("${tableName}")`).all() as { name: string }[]).map(r => r.name);
   }
 
-  // ── 用户 ──
   getUsers(): GrocyUser[] {
     if (!this.hasTable('users')) return [];
-    return this.db.prepare(
-      'SELECT id, username, password, first_name, last_name, row_created_timestamp FROM users',
-    ).all() as GrocyUser[];
+    return this.db.prepare(`SELECT id, username, password, first_name, last_name, picture_file_name, row_created_timestamp FROM users`).all() as GrocyUser[];
   }
 
-  // ── 位置 ──
   getLocations(): GrocyLocation[] {
     if (!this.hasTable('locations')) return [];
-    return this.db.prepare(
-      'SELECT id, name, description, row_created_timestamp FROM locations',
-    ).all() as GrocyLocation[];
+    return this.db.prepare(`SELECT id, name, description, is_freezer, active, row_created_timestamp FROM locations WHERE active = 1`).all() as GrocyLocation[];
   }
 
-  // ── 计量单位 ──
   getQuantityUnits(): GrocyQuantityUnit[] {
     if (!this.hasTable('quantity_units')) return [];
-    return this.db.prepare(
-      'SELECT id, name, description, row_created_timestamp FROM quantity_units',
-    ).all() as GrocyQuantityUnit[];
+    return this.db.prepare(`SELECT id, name, description, name_plural, plural_forms, active, row_created_timestamp FROM quantity_units WHERE active = 1`).all() as GrocyQuantityUnit[];
   }
 
-  // ── 产品 ──
+  getProductGroups(): GrocyProductGroup[] {
+    if (!this.hasTable('product_groups')) return [];
+    return this.db.prepare(`SELECT id, name, description, active, row_created_timestamp FROM product_groups WHERE active = 1`).all() as GrocyProductGroup[];
+  }
+
+  getShops(): GrocyShop[] {
+    if (!this.hasTable('shopping_locations')) return [];
+    return this.db.prepare(`SELECT id, name, description, active, row_created_timestamp FROM shopping_locations WHERE active = 1`).all() as GrocyShop[];
+  }
+
   getProducts(): GrocyProduct[] {
     if (!this.hasTable('products')) return [];
-    return this.db.prepare(
-      `SELECT id, name, description, location_id, qu_id_purchase, qu_id_stock,
-              qu_factor_purchase_to_stock, barcode, min_stock_amount,
-              default_best_before_days, row_created_timestamp
-       FROM products`,
-    ).all() as GrocyProduct[];
+    return this.db.prepare(`SELECT id, name, description, product_group_id, active, location_id, shopping_location_id, qu_id_purchase, qu_id_stock, min_stock_amount, default_best_before_days, parent_product_id, calories, row_created_timestamp FROM products WHERE active = 1`).all() as GrocyProduct[];
   }
 
-  // ── 当前库存 ──
+  getProductBarcodes(): GrocyProductBarcode[] {
+    if (!this.hasTable('product_barcodes')) return [];
+    return this.db.prepare(`SELECT id, product_id, barcode, qu_id, amount, shopping_location_id, last_price, row_created_timestamp, note FROM product_barcodes`).all() as GrocyProductBarcode[];
+  }
+
   getStock(): GrocyStock[] {
     if (!this.hasTable('stock')) return [];
-    return this.db.prepare(
-      `SELECT id, product_id, amount, best_before_date, purchased_date,
-              stock_id, row_created_timestamp
-       FROM stock`,
-    ).all() as GrocyStock[];
+    return this.db.prepare(`SELECT id, product_id, amount, best_before_date, purchased_date, stock_id, price, open, opened_date, location_id, shopping_location_id, note, row_created_timestamp FROM stock`).all() as GrocyStock[];
   }
 
-  // ── 库存流水 ──
   getStockLog(): GrocyStockLog[] {
     if (!this.hasTable('stock_log')) return [];
-    return this.db.prepare(
-      `SELECT id, product_id, amount, best_before_date, purchased_date,
-              used_date, spoiled, stock_id, transaction_type, row_created_timestamp
-       FROM stock_log`,
-    ).all() as GrocyStockLog[];
+    return this.db.prepare(`SELECT id, product_id, amount, best_before_date, purchased_date, used_date, spoiled, stock_id, transaction_type, price, undone, location_id, recipe_id, user_id, note, row_created_timestamp FROM stock_log WHERE undone = 0`).all() as GrocyStockLog[];
   }
 
-  // ── 购物清单 ──
-  getShoppingList(): GrocyShoppingListItem[] {
+  getShoppingListItems(): GrocyShoppingList[] {
     if (!this.hasTable('shopping_list')) return [];
-    return this.db.prepare(
-      `SELECT id, product_id, amount, amount_autoadded, row_created_timestamp
-       FROM shopping_list`,
-    ).all() as GrocyShoppingListItem[];
+    return this.db.prepare(`SELECT id, product_id, note, amount, shopping_list_id, done, qu_id, row_created_timestamp FROM shopping_list WHERE done = 0`).all() as GrocyShoppingList[];
   }
 
-  // ── 食谱 ──
   getRecipes(): GrocyRecipe[] {
     if (!this.hasTable('recipes')) return [];
-    const cols = this.getColumns('recipes');
-    const selectCols = ['id', 'name', 'description'];
-    if (cols.includes('base_servings')) selectCols.push('base_servings');
-    if (cols.includes('prep_time_minutes')) selectCols.push('prep_time_minutes');
-    if (cols.includes('cook_time_minutes')) selectCols.push('cook_time_minutes');
-    if (cols.includes('image')) selectCols.push('image');
-    selectCols.push('row_created_timestamp');
-    return this.db.prepare(
-      `SELECT ${selectCols.join(', ')} FROM recipes`,
-    ).all() as GrocyRecipe[];
+    return this.db.prepare(`SELECT id, name, description, picture_file_name, base_servings, desired_servings, type, product_id, row_created_timestamp FROM recipes`).all() as GrocyRecipe[];
   }
 
   getRecipePositions(): GrocyRecipePosition[] {
     if (!this.hasTable('recipes_pos')) return [];
-    return this.db.prepare(
-      `SELECT id, recipe_id, product_id, amount, qu_id,
-              variable_amount, note, row_created_timestamp
-       FROM recipes_pos`,
-    ).all() as GrocyRecipePosition[];
+    return this.db.prepare(`SELECT id, recipe_id, product_id, amount, note, qu_id, ingredient_group, variable_amount, row_created_timestamp FROM recipes_pos`).all() as GrocyRecipePosition[];
   }
 
-  // ── 家务 (habits/chores) ──
   getChores(): GrocyChore[] {
-    // Grocy 早期版本用 habits，后来改名 chores
-    const tableName = this.hasTable('chores') ? 'chores' : 'habits';
-    if (!this.hasTable(tableName)) return [];
-    const cols = this.getColumns(tableName);
-    const selectCols = ['id', 'name', 'description', 'period_type', 'period_days'];
-    if (cols.includes('consume_stock_on_execution')) selectCols.push('consume_stock_on_execution');
-    if (cols.includes('consume_stock_product_id')) selectCols.push('consume_stock_product_id');
-    if (cols.includes('consume_stock_quantity_unit_id')) selectCols.push('consume_stock_quantity_unit_id');
-    selectCols.push('row_created_timestamp');
-    return this.db.prepare(
-      `SELECT ${selectCols.join(', ')} FROM "${tableName}"`,
-    ).all() as GrocyChore[];
+    if (!this.hasTable('chores')) return [];
+    return this.db.prepare(`SELECT id, name, description, period_type, period_days, period_interval, period_config, track_date_only, rollover, assignment_type, assignment_config, next_execution_assigned_to_user_id, consume_product_on_execution, product_id, product_amount, active, start_date, row_created_timestamp FROM chores WHERE active = 1`).all() as GrocyChore[];
   }
 
   getChoreLogs(): GrocyChoreLog[] {
-    const tableName = this.hasTable('chores_log') ? 'chores_log' : 'habits_log';
-    if (!this.hasTable(tableName)) return [];
-    return this.db.prepare(
-      `SELECT id, ${this.hasTable('chores_log') ? 'chore_id' : 'habit_id'} AS chore_id,
-              tracked_time, execution_type, row_created_timestamp
-       FROM "${tableName}"`,
-    ).all() as GrocyChoreLog[];
+    if (!this.hasTable('chores_log')) return [];
+    return this.db.prepare(`SELECT id, chore_id, tracked_time, done_by_user_id, undone, skipped, scheduled_execution_time, row_created_timestamp FROM chores_log WHERE undone = 0`).all() as GrocyChoreLog[];
   }
 
-  /** 关闭数据库连接 */
   close(): void {
     this.db.close();
   }
