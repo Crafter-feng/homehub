@@ -440,14 +440,43 @@ export class StockService {
       .get();
     if (!item) throw new NotFoundException('物品不存在');
 
-    // Get all stock-in transactions with prices
+    // Get all stock transactions with prices
     const transactions = await this.db.select().from(invStockTransactions)
       .where(and(
         eq(invStockTransactions.itemId, itemId),
-        eq(invStockTransactions.type, 'add'),
+        sql`${invStockTransactions.type} IN ('stock-in', 'add')`,
       ))
       .orderBy(desc(invStockTransactions.createdAt))
       .all();
+
+    // Get shops for store names
+    const { mdShops } = await import('../../db/schema');
+
+    // Build price history with store info
+    const history = [];
+    for (const t of transactions) {
+      let storeName = null;
+      // Check batch for location info
+      if (t.batchId) {
+        const { invItemBatches } = await import('../../db/schema');
+        const batch = await this.db.select().from(invItemBatches)
+          .where(eq(invItemBatches.id, t.batchId))
+          .get();
+        if (batch?.locationId) {
+          const loc = await this.db.select().from((await import('../../db/schema')).mdLocations)
+            .where(eq((await import('../../db/schema')).mdLocations.id, batch.locationId))
+            .get();
+          storeName = loc?.name;
+        }
+      }
+      history.push({
+        date: t.createdAt,
+        quantity: t.quantity,
+        unit: t.unit,
+        note: t.note,
+        store: storeName || '未知',
+      });
+    }
 
     // Get current item price stats
     return {
@@ -456,12 +485,7 @@ export class StockService {
       minPrice: item.minPrice,
       maxPrice: item.maxPrice,
       lastPrice: item.lastPrice,
-      history: transactions.map((t: any) => ({
-        date: t.createdAt,
-        quantity: t.quantity,
-        unit: t.unit,
-        note: t.note,
-      })),
+      history,
     };
   }
 

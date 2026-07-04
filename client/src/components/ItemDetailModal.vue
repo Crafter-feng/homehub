@@ -96,38 +96,37 @@
                 </div>
               </div>
 
-              <!-- 价格趋势图 -->
+              <!-- 价格趋势折线图 -->
               <div class="price-chart" v-if="priceHistory.history && priceHistory.history.length > 0">
                 <h4 class="chart-title">价格趋势</h4>
-                <div class="chart-container">
-                  <div class="chart-bars">
-                    <div
-                      v-for="(record, idx) in priceHistory.history.slice(0, 10)"
-                      :key="idx"
-                      class="chart-bar-group"
-                    >
-                      <div class="chart-bar" :style="{ height: getBarHeight(record.quantity) + 'px' }">
-                        <span class="chart-bar-value">{{ record.quantity }}</span>
-                      </div>
-                      <span class="chart-bar-label">{{ formatDateShort(record.date) }}</span>
-                    </div>
-                  </div>
+                <div class="chart-legend">
+                  <span v-for="store in storeColors" :key="store.name" class="legend-item">
+                    <span class="legend-dot" :style="{ background: store.color }"></span>
+                    {{ store.name }}
+                  </span>
                 </div>
-              </div>
-
-              <!-- 价格历史列表 -->
-              <div class="price-list" v-if="priceHistory.history && priceHistory.history.length > 0">
-                <h4 class="list-title">入库记录</h4>
-                <div class="list-items">
-                  <div v-for="(record, idx) in priceHistory.history" :key="idx" class="list-item">
-                    <div class="list-item-left">
-                      <span class="list-item-date">{{ formatDate(record.date) }}</span>
-                      <span class="list-item-qty">{{ record.quantity }} {{ record.unit }}</span>
-                    </div>
-                    <div class="list-item-right">
-                      <span class="list-item-note" v-if="record.note">{{ record.note }}</span>
-                    </div>
-                  </div>
+                <div class="chart-container">
+                  <svg :viewBox="`0 0 ${chartWidth} ${chartHeight}`" class="line-chart">
+                    <!-- Y轴标签 -->
+                    <text v-for="(tick, idx) in yTicks" :key="'y'+idx"
+                      :x="chartPadding.left - 8" :y="tick.y + 4"
+                      text-anchor="end" class="axis-label">¥{{ tick.value }}</text>
+                    <!-- X轴标签 -->
+                    <text v-for="(tick, idx) in xTicks" :key="'x'+idx"
+                      :x="tick.x" :y="chartHeight - 5"
+                      text-anchor="middle" class="axis-label">{{ tick.label }}</text>
+                    <!-- 网格线 -->
+                    <line v-for="(tick, idx) in yTicks" :key="'gy'+idx"
+                      :x1="chartPadding.left" :y1="tick.y" :x2="chartWidth - chartPadding.right" :y2="tick.y"
+                      stroke="#e0e0e6" stroke-width="1" stroke-dasharray="4,4" />
+                    <!-- 折线 -->
+                    <polyline v-for="(line, idx) in chartLines" :key="'line'+idx"
+                      :points="line.points"
+                      fill="none" :stroke="line.color" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                    <!-- 数据点 -->
+                    <circle v-for="(point, idx) in chartPoints" :key="'pt'+idx"
+                      :cx="point.x" :cy="point.y" r="4" :fill="point.color" stroke="white" stroke-width="2" />
+                  </svg>
                 </div>
               </div>
 
@@ -175,7 +174,7 @@
                   <div class="timeline-dot" :style="{ background: getHistoryColor(record.type) }"></div>
                   <div class="timeline-content">
                     <div class="timeline-text">
-                      <span class="history-type-label">{{ record.type }}</span>
+                      <span class="history-type-label">{{ translateType(record.type) }}</span>
                       <span class="history-quantity">× {{ record.quantity }}</span>
                     </div>
                     <div class="timeline-meta">
@@ -439,17 +438,132 @@ const loadPriceHistory = async () => {
   }
 };
 
-const getBarHeight = (quantity: number): number => {
-  if (!priceHistory.value?.history?.length) return 0;
-  const maxQty = Math.max(...priceHistory.value.history.map((r: any) => r.quantity));
-  return maxQty > 0 ? (quantity / maxQty) * 80 : 0;
-};
-
 const formatDateShort = (dateStr: string | Date): string => {
   if (!dateStr) return '';
   const d = new Date(dateStr);
   return `${d.getMonth() + 1}/${d.getDate()}`;
 };
+
+// Chart constants
+const chartWidth = 400;
+const chartHeight = 200;
+const chartPadding = { top: 20, right: 20, bottom: 30, left: 50 };
+
+// Store colors (similar to Grocy's color scheme)
+const storeColorPalette = [
+  '#409EFF', // blue
+  '#67C23A', // green
+  '#E6A23C', // yellow
+  '#F56C6C', // red
+  '#909399', // gray
+  '#00CED1', // teal
+  '#FF69B4', // pink
+  '#8B4513', // brown
+];
+
+const storeColors = computed(() => {
+  if (!priceHistory.value?.history) return [];
+  const stores = new Set<string>();
+  priceHistory.value.history.forEach((r: any) => stores.add(r.store));
+  return Array.from(stores).map((name, idx) => ({
+    name,
+    color: storeColorPalette[idx % storeColorPalette.length],
+  }));
+});
+
+// Type translation map
+const typeTranslationMap: Record<string, string> = {
+  'add': '入库',
+  'stock-in': '入库',
+  'consume': '消耗',
+  'transfer': '转移',
+  'adjust': '调整',
+  'inventory-correction': '库存调整',
+};
+
+const translateType = (type: string): string => {
+  return typeTranslationMap[type] || type;
+};
+
+const priceRange = computed(() => {
+  if (!priceHistory.value?.history?.length) return { min: 0, max: 100 };
+  const prices = priceHistory.value.history.map((r: any) => r.quantity);
+  const min = Math.min(...prices);
+  const max = Math.max(...prices);
+  const padding = (max - min) * 0.1 || 10;
+  return { min: Math.max(0, min - padding), max: max + padding };
+});
+
+const yTicks = computed(() => {
+  const { min, max } = priceRange.value;
+  const ticks = [];
+  const steps = 4;
+  for (let i = 0; i <= steps; i++) {
+    const value = min + (max - min) * (i / steps);
+    const y = chartPadding.top + (chartHeight - chartPadding.top - chartPadding.bottom) * (1 - i / steps);
+    ticks.push({ value: Math.round(value), y });
+  }
+  return ticks;
+});
+
+const xTicks = computed(() => {
+  if (!priceHistory.value?.history?.length) return [];
+  const history = priceHistory.value.history;
+  const ticks = [];
+  const maxTicks = Math.min(history.length, 5);
+  for (let i = 0; i < maxTicks; i++) {
+    const idx = Math.floor(i * (history.length - 1) / Math.max(maxTicks - 1, 1));
+    const x = chartPadding.left + (chartWidth - chartPadding.left - chartPadding.right) * idx / Math.max(history.length - 1, 1);
+    ticks.push({ label: formatDateShort(history[idx].date), x });
+  }
+  return ticks;
+});
+
+const chartLines = computed(() => {
+  if (!priceHistory.value?.history?.length) return [];
+  const history = [...priceHistory.value.history].reverse(); // chronological order
+  const { min, max } = priceRange.value;
+
+  // Group by store
+  const storeData = new Map<string, Array<any>>();
+  history.forEach((r: any) => {
+    if (!storeData.has(r.store)) storeData.set(r.store, []);
+    storeData.get(r.store)!.push(r);
+  });
+
+  const lines: Array<{ points: string; color: string }> = [];
+  storeColors.value.forEach(({ name, color }) => {
+    const data = storeData.get(name) || [];
+    if (data.length < 2) return; // Need at least 2 points for a line
+
+    const points = data.map((r: any, idx: number) => {
+      const x = chartPadding.left + (chartWidth - chartPadding.left - chartPadding.right) * idx / Math.max(history.length - 1, 1);
+      const y = chartPadding.top + (chartHeight - chartPadding.top - chartPadding.bottom) * (1 - (r.quantity - min) / (max - min));
+      return `${x},${y}`;
+    }).join(' ');
+
+    lines.push({ points, color });
+  });
+
+  return lines;
+});
+
+const chartPoints = computed(() => {
+  if (!priceHistory.value?.history?.length) return [];
+  const history = [...priceHistory.value.history].reverse();
+  const { min, max } = priceRange.value;
+
+  const storeColorMap = new Map(storeColors.value.map(s => [s.name, s.color]));
+  const points: Array<{ x: number; y: number; color: string }> = [];
+
+  history.forEach((r: any, idx: number) => {
+    const x = chartPadding.left + (chartWidth - chartPadding.left - chartPadding.right) * idx / Math.max(history.length - 1, 1);
+    const y = chartPadding.top + (chartHeight - chartPadding.top - chartPadding.bottom) * (1 - (r.quantity - min) / (max - min));
+    points.push({ x, y, color: storeColorMap.get(r.store) || '#909399' });
+  });
+
+  return points;
+});
 
 const isBatchExpired = (batch: any) => {
   return batch.expiryDate && new Date(batch.expiryDate) < new Date();
@@ -631,7 +745,7 @@ const handleDelete = () => {
 
 .timeline {
   position: relative;
-  padding-left: 20px;
+  padding-left: 24px;
 }
 
 .timeline-item {
@@ -662,7 +776,7 @@ const handleDelete = () => {
 }
 
 .timeline-content {
-  padding-left: 8px;
+  padding-left: 12px;
 }
 
 .timeline-text {
@@ -807,54 +921,49 @@ const handleDelete = () => {
   margin-bottom: 16px;
 }
 
-.chart-title, .list-title {
+.chart-title {
   font-size: 13px;
   font-weight: 600;
   color: var(--hh-text);
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
-.chart-container {
-  padding: 12px;
-  background: var(--hh-bg-secondary, #f5f5f5);
-  border-radius: 8px;
-}
-
-.chart-bars {
+.chart-legend {
   display: flex;
-  align-items: flex-end;
-  justify-content: space-around;
-  height: 100px;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 8px;
+  font-size: 12px;
+  color: var(--hh-text-secondary);
 }
 
-.chart-bar-group {
+.legend-item {
   display: flex;
-  flex-direction: column;
   align-items: center;
   gap: 4px;
 }
 
-.chart-bar {
-  width: 24px;
-  background: var(--hh-primary, #409eff);
-  border-radius: 4px 4px 0 0;
-  min-height: 4px;
-  position: relative;
+.legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
 }
 
-.chart-bar-value {
-  position: absolute;
-  top: -16px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 10px;
-  color: var(--hh-text-secondary);
-  white-space: nowrap;
+.chart-container {
+  padding: 8px;
+  background: var(--hh-bg-secondary, #f5f5f5);
+  border-radius: 8px;
+  overflow: hidden;
 }
 
-.chart-bar-label {
+.line-chart {
+  width: 100%;
+  height: auto;
+}
+
+.axis-label {
   font-size: 10px;
-  color: var(--hh-text-tertiary);
+  fill: var(--hh-text-tertiary, #999);
 }
 
 .price-list {
