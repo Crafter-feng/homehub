@@ -83,6 +83,11 @@ export class StockController {
     return this.stockService.getHistory(parseInt(id), req.user.familyId);
   }
 
+  @Get('items/:id/price-history')
+  getPriceHistory(@Param('id') id: string, @Request() req: AuthedRequest) {
+    return this.stockService.getPriceHistory(parseInt(id), req.user.familyId);
+  }
+
   @Get('expiring')
   getExpiring(@Request() req: AuthedRequest, @Query('days') days?: string) {
     return this.stockService.getExpiring(req.user.familyId, days ? parseInt(days) : 7);

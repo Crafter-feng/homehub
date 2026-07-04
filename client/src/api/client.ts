@@ -159,6 +159,7 @@ export const stockApi = {
   adjust: (id: number, data: { quantity: number; note?: string }) =>
     api.post(`/stock/items/${id}/adjust`, data),
   getHistory: (id: number) => api.get(`/stock/items/${id}/history`),
+  getPriceHistory: (id: number) => api.get(`/stock/items/${id}/price-history`),
   getExpiring: (days?: number) => api.get('/stock/expiring', { params: { days } }),
   getSummary: () => api.get('/stock/summary'),
   // Batch API

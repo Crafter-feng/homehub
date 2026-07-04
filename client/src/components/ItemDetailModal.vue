@@ -126,6 +126,69 @@
             </div>
             <n-empty v-else description="暂无操作记录" />
           </n-tab-pane>
+
+          <!-- 价格追踪 Tab -->
+          <n-tab-pane name="price" tab="价格追踪">
+            <div class="price-section" v-if="priceHistory">
+              <!-- 价格概览卡片 -->
+              <div class="price-overview">
+                <div class="price-stat">
+                  <span class="price-stat-label">当前价格</span>
+                  <span class="price-stat-value price-primary">¥{{ priceHistory.currentPrice || '-' }}</span>
+                </div>
+                <div class="price-stat">
+                  <span class="price-stat-label">平均价格</span>
+                  <span class="price-stat-value">¥{{ priceHistory.avgPrice ? priceHistory.avgPrice.toFixed(2) : '-' }}</span>
+                </div>
+                <div class="price-stat">
+                  <span class="price-stat-label">最低价格</span>
+                  <span class="price-stat-value price-success">¥{{ priceHistory.minPrice || '-' }}</span>
+                </div>
+                <div class="price-stat">
+                  <span class="price-stat-label">最高价格</span>
+                  <span class="price-stat-value price-danger">¥{{ priceHistory.maxPrice || '-' }}</span>
+                </div>
+              </div>
+
+              <!-- 价格趋势图 -->
+              <div class="price-chart" v-if="priceHistory.history && priceHistory.history.length > 0">
+                <h4 class="chart-title">价格趋势</h4>
+                <div class="chart-container">
+                  <div class="chart-bars">
+                    <div
+                      v-for="(record, idx) in priceHistory.history.slice(0, 10)"
+                      :key="idx"
+                      class="chart-bar-group"
+                    >
+                      <div class="chart-bar" :style="{ height: getBarHeight(record.quantity) + 'px' }">
+                        <span class="chart-bar-value">{{ record.quantity }}</span>
+                      </div>
+                      <span class="chart-bar-label">{{ formatDateShort(record.date) }}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 价格历史列表 -->
+              <div class="price-list" v-if="priceHistory.history && priceHistory.history.length > 0">
+                <h4 class="list-title">入库记录</h4>
+                <div class="list-items">
+                  <div v-for="(record, idx) in priceHistory.history" :key="idx" class="list-item">
+                    <div class="list-item-left">
+                      <span class="list-item-date">{{ formatDate(record.date) }}</span>
+                      <span class="list-item-qty">{{ record.quantity }} {{ record.unit }}</span>
+                    </div>
+                    <div class="list-item-right">
+                      <span class="list-item-note" v-if="record.note">{{ record.note }}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <n-empty v-else description="暂无价格记录" />
+            </div>
+            <n-empty v-else description="加载中..." />
+          </n-tab-pane>
         </n-tabs>
       </div>
     </n-spin>
@@ -234,6 +297,9 @@ const transferLocation = ref<number | null>(null);
 const batches = ref<any[]>([]);
 const compacting = ref(false);
 
+// Price history state
+const priceHistory = ref<any>(null);
+
 const locationSelectOptions = computed(() =>
   locations.value.map(l => ({ label: l.name, value: l.id }))
 );
@@ -283,6 +349,7 @@ const loadData = async () => {
     history.value = historyRes.data || [];
     locations.value = (locRes.data || []) as Location[];
     loadBatches();
+    loadPriceHistory();
   } catch {
     message.error('加载失败');
   } finally {
@@ -359,6 +426,29 @@ const loadBatches = async () => {
   } catch {
     batches.value = [];
   }
+};
+
+// Price history methods
+const loadPriceHistory = async () => {
+  if (!item.value) return;
+  try {
+    const res = await stockApi.getPriceHistory(item.value.id);
+    priceHistory.value = res.data;
+  } catch {
+    priceHistory.value = null;
+  }
+};
+
+const getBarHeight = (quantity: number): number => {
+  if (!priceHistory.value?.history?.length) return 0;
+  const maxQty = Math.max(...priceHistory.value.history.map((r: any) => r.quantity));
+  return maxQty > 0 ? (quantity / maxQty) * 80 : 0;
+};
+
+const formatDateShort = (dateStr: string | Date): string => {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  return `${d.getMonth() + 1}/${d.getDate()}`;
 };
 
 const isBatchExpired = (batch: any) => {
@@ -667,5 +757,145 @@ const handleDelete = () => {
 
 .text-danger {
   color: var(--hh-error, #e53e3e);
+}
+
+/* Price section */
+.price-section {
+  padding: 8px 0;
+}
+
+.price-overview {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.price-stat {
+  padding: 10px 12px;
+  border: 1px solid var(--hh-border-light, #e0e0e6);
+  border-radius: 8px;
+  background: var(--hh-bg-secondary, #f5f5f5);
+}
+
+.price-stat-label {
+  display: block;
+  font-size: 12px;
+  color: var(--hh-text-secondary);
+  margin-bottom: 4px;
+}
+
+.price-stat-value {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--hh-text);
+}
+
+.price-primary {
+  color: var(--hh-primary, #409eff);
+}
+
+.price-success {
+  color: var(--hh-success, #67c23a);
+}
+
+.price-danger {
+  color: var(--hh-error, #e53e3e);
+}
+
+.price-chart {
+  margin-bottom: 16px;
+}
+
+.chart-title, .list-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--hh-text);
+  margin-bottom: 12px;
+}
+
+.chart-container {
+  padding: 12px;
+  background: var(--hh-bg-secondary, #f5f5f5);
+  border-radius: 8px;
+}
+
+.chart-bars {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-around;
+  height: 100px;
+}
+
+.chart-bar-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.chart-bar {
+  width: 24px;
+  background: var(--hh-primary, #409eff);
+  border-radius: 4px 4px 0 0;
+  min-height: 4px;
+  position: relative;
+}
+
+.chart-bar-value {
+  position: absolute;
+  top: -16px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 10px;
+  color: var(--hh-text-secondary);
+  white-space: nowrap;
+}
+
+.chart-bar-label {
+  font-size: 10px;
+  color: var(--hh-text-tertiary);
+}
+
+.price-list {
+  margin-top: 8px;
+}
+
+.list-items {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.list-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  border: 1px solid var(--hh-border-light, #e0e0e6);
+  border-radius: 6px;
+  background: var(--hh-bg-secondary, #f5f5f5);
+}
+
+.list-item-left {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.list-item-date {
+  font-size: 13px;
+  color: var(--hh-text-secondary);
+}
+
+.list-item-qty {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--hh-text);
+}
+
+.list-item-note {
+  font-size: 12px;
+  color: var(--hh-text-tertiary);
 }
 </style>

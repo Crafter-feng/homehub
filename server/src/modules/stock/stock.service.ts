@@ -433,6 +433,38 @@ export class StockService {
       .all();
   }
 
+  async getPriceHistory(itemId: number, familyId: number) {
+    // Verify item belongs to family
+    const item = await this.db.select().from(invItems)
+      .where(and(eq(invItems.id, itemId), eq(invItems.familyId, familyId)))
+      .get();
+    if (!item) throw new NotFoundException('物品不存在');
+
+    // Get all stock-in transactions with prices
+    const transactions = await this.db.select().from(invStockTransactions)
+      .where(and(
+        eq(invStockTransactions.itemId, itemId),
+        eq(invStockTransactions.type, 'add'),
+      ))
+      .orderBy(desc(invStockTransactions.createdAt))
+      .all();
+
+    // Get current item price stats
+    return {
+      currentPrice: item.purchasePrice,
+      avgPrice: item.avgPrice,
+      minPrice: item.minPrice,
+      maxPrice: item.maxPrice,
+      lastPrice: item.lastPrice,
+      history: transactions.map((t: any) => ({
+        date: t.createdAt,
+        quantity: t.quantity,
+        unit: t.unit,
+        note: t.note,
+      })),
+    };
+  }
+
   async getExpiring(familyId: number, days: number = 7) {
     const deadline = Math.floor(daysFromNow(days) / 1000);
     const now = Math.floor(Date.now() / 1000);

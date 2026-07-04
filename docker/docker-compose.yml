@@ -1,39 +1,28 @@
 version: '3.8'
 
 services:
-  # ---- Frontend (Nginx) ----
-  client:
+  # ---- 应用服务 (NestJS API + 前端 SPA 合并) ----
+  app:
     build:
       context: ..
-      dockerfile: docker/client/Dockerfile
-    container_name: homehub-client
-    ports:
-      - "${CLIENT_PORT:-80}:80"
-    depends_on:
-      server:
-        condition: service_healthy
-    restart: unless-stopped
-
-  # ---- Backend (NestJS) ----
-  server:
-    build:
-      context: ..
-      dockerfile: docker/server/Dockerfile
-    container_name: homehub-server
+      dockerfile: docker/Dockerfile
+    container_name: homehub
     environment:
       NODE_ENV: production
       DB_TYPE: postgres
       DATABASE_URL: postgres://homehub:${DB_PASSWORD:-homehub-dev}@homehub-db:5432/homehub
       JWT_SECRET: ${JWT_SECRET:-change-this-in-production}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-change-this-refresh-in-production}
-      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost}
       PORT: 3000
+      CLIENT_DIST_PATH: /app/client/dist
     ports:
-      - "${SERVER_PORT:-3000}:3000"
+      - "${PORT:-80}:3000"
     volumes:
       - uploads_data:/app/server/uploads
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/v1/health"]
