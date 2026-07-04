@@ -29,6 +29,7 @@ const router = createRouter({
         { path: 'budget', name: 'budget', component: () => import('@/views/budget/BudgetPage.vue') },
         { path: 'backup', name: 'backup', component: () => import('@/views/backup/BackupPage.vue') },
         { path: 'settings', name: 'settings', component: () => import('@/views/settings/Settings.vue') },
+        { path: 'custom-fields', name: 'custom-fields', component: () => import('@/views/settings/CustomFields.vue') },
         { path: 'mcp-tools', name: 'mcp-tools', component: () => import('@/views/mcp/McpTools.vue') },
         { path: 'api-docs', name: 'api-docs', component: () => import('@/views/api-docs/ApiDocs.vue') },
         { path: 'admin', name: 'admin', component: () => import('@/views/admin/AdminPanel.vue') },

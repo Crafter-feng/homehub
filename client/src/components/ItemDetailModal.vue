@@ -196,7 +196,7 @@
 import { ref, computed, watch } from 'vue';
 import {
   NModal, NSpin, NButton, NSpace, NFormItem, NEmpty,
-  NInputNumber, NInput, NSelect, NTag, useMessage, useDialog,
+  NInputNumber, NInput, NSelect, NTag, NTabs, NTabPane, useMessage, useDialog,
 } from 'naive-ui';
 import { stockApi, locationsApi } from '@/api/client';
 import type { Item, StockTransaction, Location } from '@/shared/types';

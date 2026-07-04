@@ -444,6 +444,19 @@ export const backupApi = {
   cleanup: (retentionDays: number) => api.post('/backup/cleanup', { retentionDays }),
 };
 
+// === Custom Fields API ===
+export const customFieldsApi = {
+  listDefs: (entityType: string) => api.get(`/custom-fields/${entityType}`),
+  createDef: (entityType: string, data: any) => api.post(`/custom-fields/${entityType}`, data),
+  updateDef: (fieldId: number, data: any) => api.put(`/custom-fields/field/${fieldId}`, data),
+  deleteDef: (fieldId: number) => api.delete(`/custom-fields/field/${fieldId}`),
+  getValues: (entityType: string, entityId: number) => api.get(`/custom-fields/${entityType}/${entityId}/values`),
+  setValues: (entityType: string, entityId: number, values: any[]) =>
+    api.put(`/custom-fields/${entityType}/${entityId}/values`, { values }),
+  search: (entityType: string, fieldName: string, value: string) =>
+    api.get(`/custom-fields/${entityType}/search`, { params: { fieldName, value } }),
+};
+
 // === History API ===
 export const historyApi = {
   getTimeline: (params?: { page?: number; limit?: number; type?: string; source?: string; itemId?: number; userId?: number }) =>
