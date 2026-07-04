@@ -1,7 +1,7 @@
 import { Injectable, Inject } from '@nestjs/common';
 import { DATABASE_TOKEN } from '../../db/database.module';
 import { eq, sql } from 'drizzle-orm';
-import { users, families, familyMembers, apiTokens, invItems, sysScanLogs } from '../../db/schema';
+import { users, families, familyMembers, apiTokens, invItems } from '../../db/schema';
 import { PluginRegistryService } from '../../plugins/registry/plugin-registry.service';
 
 @Injectable()
@@ -18,13 +18,11 @@ export class AdminService {
     const userCount = await this.db.select({ count: sql<number>`count(*)` }).from(users).get();
     const familyCount = await this.db.select({ count: sql<number>`count(*)` }).from(families).get();
     const itemCount = await this.db.select({ count: sql<number>`count(*)` }).from(invItems).get();
-    const scanCount = await this.db.select({ count: sql<number>`count(*)` }).from(sysScanLogs).get();
 
     return {
       totalUsers: userCount?.count ?? 0,
       totalFamilies: familyCount?.count ?? 0,
       totalItems: itemCount?.count ?? 0,
-      totalScans: scanCount?.count ?? 0,
     };
   }
 

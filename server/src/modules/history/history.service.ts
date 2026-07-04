@@ -1,7 +1,7 @@
 import { Injectable, Inject } from '@nestjs/common';
 import { DATABASE_TOKEN } from '../../db/database.module';
 import { eq, and, desc, sql, gte, lte } from 'drizzle-orm';
-import { invStockTransactions, sysScanLogs, invItems } from '../../db/schema';
+import { invStockTransactions, invItems } from '../../db/schema';
 import { PaginationQuery, PaginationResponse } from '../../common/dto/pagination.dto';
 import { TimelineQueryDto } from './dto/history.dto';
 
@@ -81,14 +81,8 @@ export class HistoryService {
     return new PaginationResponse(data, total, pagination.page, pagination.limit);
   }
 
-  /**
-   * 扫描日志列表
-   */
-  async getScanLogs(familyId: number, limit?: number) {
-    return this.db.select().from(sysScanLogs)
-      .where(eq(sysScanLogs.familyId, familyId))
-      .orderBy(desc(sysScanLogs.createdAt))
-      .limit(limit ?? 50)
-      .all();
+  /** 扫描日志 — 已移除数据库存储，改为 Logger 输出 */
+  async getScanLogs(_familyId: number, _limit?: number) {
+    return [];
   }
 }

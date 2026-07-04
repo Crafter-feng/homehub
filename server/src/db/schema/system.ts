@@ -76,18 +76,6 @@ export const sysAutomationTriggers = sqliteTable('sys_automation_triggers', {
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
 });
 
-// ── 扫描日志 ──
-export const sysScanLogs = sqliteTable('sys_scan_logs', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
-  familyId: integer('family_id').notNull().references(() => families.id),
-  userId: integer('user_id'),
-  scanType: text('scan_type', { enum: ['nfc', 'qr', 'barcode', 'rfid'] }).notNull(),
-  code: text('code').notNull(),
-  action: text('action').notNull(),
-  context: text('context', { mode: 'json' }),
-  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
-});
-
 // ── 编码任务 ──
 export const sysEncoderJobs = sqliteTable('sys_encoder_jobs', {
   id: integer('id').primaryKey({ autoIncrement: true }),

@@ -96,7 +96,7 @@ describe('StockService', () => {
   });
 
   it('should record transaction history', async () => {
-    const history = await service.getHistory(itemId);
+    const history = await service.getHistory(itemId, 1);
     expect(history.length).toBeGreaterThan(0);
     const types = history.map((h: any) => h.type);
     expect(types).toContain('add');

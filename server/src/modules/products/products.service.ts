@@ -26,8 +26,10 @@ export class ProductsService {
       .all();
   }
 
-  async getById(id: number): Promise<any> {
-    const product = await this.db.select().from(invProducts).where(eq(invProducts.id, id)).get();
+  async getById(id: number, familyId: number): Promise<any> {
+    const product = await this.db.select().from(invProducts)
+      .where(and(eq(invProducts.id, id), eq(invProducts.familyId, familyId)))
+      .get();
     if (!product) throw new NotFoundException('产品不存在');
     return product;
   }

@@ -23,8 +23,8 @@ export class ProductsController {
   }
 
   @Get(':id')
-  getById(@Param('id') id: string) {
-    return this.productsService.getById(parseInt(id));
+  getById(@Param('id') id: string, @Request() req: AuthedRequest) {
+    return this.productsService.getById(parseInt(id), req.user.familyId);
   }
 
   @Post()

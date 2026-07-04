@@ -41,12 +41,12 @@ describe('ProductsService', () => {
 
   it('should get product by id', async () => {
     const p = await service.create(1, { name: '查詢產品' });
-    const found = await service.getById(p.id);
+    const found = await service.getById(p.id, 1);
     expect(found.id).toBe(p.id);
   });
 
   it('should throw for non-existent product', async () => {
-    await expect(service.getById(99999)).rejects.toThrow('产品不存在');
+    await expect(service.getById(99999, 1)).rejects.toThrow('产品不存在');
   });
 
   it('should update a product', async () => {
@@ -59,7 +59,7 @@ describe('ProductsService', () => {
   it('should delete a product', async () => {
     const p = await service.create(1, { name: '待删除' });
     await service.delete(p.id, 1);
-    await expect(service.getById(p.id)).rejects.toThrow('产品不存在');
+    await expect(service.getById(p.id, 1)).rejects.toThrow('产品不存在');
   });
 
   it('should isolate by familyId', async () => {

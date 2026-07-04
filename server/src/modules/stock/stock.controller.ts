@@ -79,8 +79,8 @@ export class StockController {
   }
 
   @Get('items/:id/history')
-  getItemHistory(@Param('id') id: string) {
-    return this.stockService.getHistory(parseInt(id));
+  getItemHistory(@Param('id') id: string, @Request() req: AuthedRequest) {
+    return this.stockService.getHistory(parseInt(id), req.user.familyId);
   }
 
   @Get('expiring')

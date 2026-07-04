@@ -1,7 +1,7 @@
 import { Injectable, Inject } from '@nestjs/common';
 import { DATABASE_TOKEN } from '../../db/database.module';
 import { eq, and, desc, sql, like, gte, lte } from 'drizzle-orm';
-import { invStockTransactions, invItems, hhLists, hhListItems, sysScanLogs, sysAutomationTriggers, mdCategories } from '../../db/schema';
+import { invStockTransactions, invItems, hhLists, hhListItems, sysAutomationTriggers, mdCategories } from '../../db/schema';
 
 @Injectable()
 export class DashboardService {
@@ -64,28 +64,6 @@ export class DashboardService {
         detail: `${item.content} (${item.listName})`,
         source: item.listType,
         createdAt: item.completedAt,
-      });
-    }
-
-    // 扫描记录
-    const scans = await this.db.select({
-      id: sysScanLogs.id,
-      scanType: sysScanLogs.scanType,
-      code: sysScanLogs.code,
-      action: sysScanLogs.action,
-      createdAt: sysScanLogs.createdAt,
-    }).from(sysScanLogs)
-      .where(eq(sysScanLogs.familyId, familyId))
-      .orderBy(desc(sysScanLogs.createdAt))
-      .limit(limit);
-
-    for (const scan of scans) {
-      activities.push({
-        id: `scan-${scan.id}`,
-        type: 'scan',
-        action: `扫描${scan.scanType.toUpperCase()}`,
-        detail: scan.action,
-        createdAt: scan.createdAt,
       });
     }
 

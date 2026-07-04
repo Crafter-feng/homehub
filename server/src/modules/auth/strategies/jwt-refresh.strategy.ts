@@ -3,6 +3,7 @@ import { PassportStrategy } from '@nestjs/passport';
 import { Strategy } from 'passport-jwt';
 import { Request } from 'express';
 import { ConfigService } from '../../../config/config.service';
+import { JWT_REFRESH_SECRET } from '../auth.constants';
 
 @Injectable()
 export class JwtRefreshStrategy extends PassportStrategy(Strategy, 'jwt-refresh') {
@@ -13,7 +14,7 @@ export class JwtRefreshStrategy extends PassportStrategy(Strategy, 'jwt-refresh'
       jwtFromRequest: (req: Request) => req?.body?.refreshToken ?? null,
       passReqToCallback: false,
       ignoreExpiration: false,
-      secretOrKey: configService.get('JWT_REFRESH_SECRET', 'homehub-dev-refresh-secret-change-in-production'),
+      secretOrKey: configService.get('JWT_REFRESH_SECRET', JWT_REFRESH_SECRET),
     });
   }
 

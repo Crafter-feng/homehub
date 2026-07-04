@@ -565,7 +565,7 @@ async function loadData() {
       shopsApi.list().then(r => r.data || []),
       tagsApi.list().then(r => r.data || []),
     ]);
-    products.value = prodRes.data || [];
+    products.value = prodRes || [];
     locations.value = locRes.data || [];
     types.value = typeRes;
     units.value = unitRes || [];

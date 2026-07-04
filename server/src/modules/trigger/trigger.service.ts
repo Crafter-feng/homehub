@@ -1,13 +1,15 @@
-import { Injectable, Inject, NotFoundException } from '@nestjs/common';
+import { Injectable, Inject, NotFoundException, Logger } from '@nestjs/common';
 import { DATABASE_TOKEN } from '../../db/database.module';
 import { eq, and, sql, desc } from 'drizzle-orm';
-import { sysTriggerBindings, sysScanLogs, sysAutomationTriggers } from '../../db/schema';
+import { sysTriggerBindings, sysAutomationTriggers } from '../../db/schema';
 import { CreateBindingDto, UpdateBindingDto, ScanEventDto, CreateAutomationDto } from './dto/trigger.dto';
 import { TriggerResolverService } from '../../plugins/core/trigger-resolver.service';
 import { ScanResult, ResolveContext, ResolvedAction } from '../../plugins/types/plugin.types';
 
 @Injectable()
 export class TriggerService {
+  private readonly logger = new Logger(TriggerService.name);
+
   constructor(
     @Inject(DATABASE_TOKEN) private readonly db: any,
     private readonly resolver: TriggerResolverService,
@@ -128,15 +130,8 @@ export class TriggerService {
     // 5. Resolve action using TriggerResolverService
     const resolvedAction = await this.resolver.resolve(scan, context, binding);
 
-    // 6. Record scan log
-    await this.db.insert(sysScanLogs).values({
-      familyId,
-      userId,
-      scanType: dto.codeType as any,
-      code: dto.code,
-      action: resolvedAction.primary,
-      context: dto.metadata,
-    });
+    // Record scan log
+    this.logger.log(`扫码记录: [${dto.codeType}] ${dto.code} → ${resolvedAction.primary} (家庭: ${familyId})`);
 
     // 7. Return result — includes ResolvedAction for enriched frontend usage
     //    plus backward-compat 'action' string field
@@ -333,12 +328,8 @@ export class TriggerService {
     return { installed: results.filter((r: any) => r.action === 'created').length, results };
   }
 
-  // === 扫描日志 ===
-  async getScanLogs(familyId: number, limit: number = 50) {
-    return this.db.select().from(sysScanLogs)
-      .where(eq(sysScanLogs.familyId, familyId))
-      .orderBy(desc(sysScanLogs.createdAt))
-      .limit(limit)
-      .all();
+  // === 扫描日志（已移除 DB 存储，使用 Logger 输出）===
+  async getScanLogs(_familyId: number, _limit: number = 50) {
+    return [];
   }
 }

@@ -7,13 +7,14 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 import { JwtRefreshStrategy } from './strategies/jwt-refresh.strategy';
 import { RefreshTokenGuard } from './guards/refresh-token.guard';
 import { ConfigService } from '../../config/config.service';
+import { JWT_SECRET } from './auth.constants';
 
 @Module({
   imports: [
     PassportModule,
     JwtModule.registerAsync({
       useFactory: (config: ConfigService) => ({
-        secret: config.get('JWT_SECRET', 'homehub-dev-secret-change-in-production'),
+        secret: config.get('JWT_SECRET', JWT_SECRET),
         signOptions: { expiresIn: '15m' },
       }),
       inject: [ConfigService],

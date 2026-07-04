@@ -1,6 +1,6 @@
 import { Injectable, Inject, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { DATABASE_TOKEN } from '../../db/database.module';
-import { eq, and, sql, desc } from 'drizzle-orm';
+import { eq, and, sql, desc, inArray } from 'drizzle-orm';
 import { hhLists, hhListItems, hhListItemComments, hhHolidayTemplates } from '../../db/schema';
 import { invItems } from '../../db/schema';
 import { CreateListDto, UpdateListDto, AddListItemDto, UpdateListItemDto, AssignListItemDto, AddCommentDto } from './dto/list.dto';
@@ -26,12 +26,12 @@ export class ListsService {
       .get();
     if (!list) throw new NotFoundException('清单不存在');
 
-    const invItems = await this.db.select().from(hhListItems)
+    const items = await this.db.select().from(hhListItems)
       .where(eq(hhListItems.listId, listId))
       .orderBy(hhListItems.sortOrder)
       .all();
 
-    return { ...list, invItems };
+    return { ...list, items };
   }
 
   async create(familyId: number, userId: number, dto: CreateListDto) {
@@ -104,11 +104,15 @@ export class ListsService {
     }).returning().get();
   }
 
-  async updateItem(itemId: number, dto: UpdateListItemDto) {
+  async updateItem(itemId: number, familyId: number, dto: UpdateListItemDto) {
     const item = await this.db.select().from(hhListItems)
       .where(eq(hhListItems.id, itemId))
       .get();
     if (!item) throw new NotFoundException('条目不存在');
+    const list = await this.db.select().from(hhLists)
+      .where(and(eq(hhLists.id, item.listId), eq(hhLists.familyId, familyId)))
+      .get();
+    if (!list) throw new NotFoundException('清单不存在');
 
     const updates: Record<string, any> = {};
     if (dto.content) updates.content = dto.content;
@@ -121,7 +125,16 @@ export class ListsService {
     return this.db.select().from(hhListItems).where(eq(hhListItems.id, itemId)).get();
   }
 
-  async deleteItem(itemId: number) {
+  async deleteItem(itemId: number, familyId: number) {
+    const item = await this.db.select().from(hhListItems)
+      .where(eq(hhListItems.id, itemId))
+      .get();
+    if (!item) throw new NotFoundException('条目不存在');
+    const list = await this.db.select().from(hhLists)
+      .where(and(eq(hhLists.id, item.listId), eq(hhLists.familyId, familyId)))
+      .get();
+    if (!list) throw new NotFoundException('清单不存在');
+
     await this.db.delete(hhListItems).where(eq(hhListItems.id, itemId)).run();
     return { success: true };
   }
@@ -179,7 +192,14 @@ export class ListsService {
     return this.db.select().from(hhListItems).where(eq(hhListItems.id, itemId)).get();
   }
 
-  async uncheckItem(itemId: number) {
+  async uncheckItem(itemId: number, familyId: number) {
+    const item = await this.db.select().from(hhListItems)
+      .where(eq(hhListItems.id, itemId)).get();
+    if (!item) throw new NotFoundException('条目不存在');
+    const list = await this.db.select().from(hhLists)
+      .where(and(eq(hhLists.id, item.listId), eq(hhLists.familyId, familyId))).get();
+    if (!list) throw new NotFoundException('清单不存在');
+
     await this.db.update(hhListItems).set({
       status: 'pending',
       completedBy: null,
@@ -189,7 +209,14 @@ export class ListsService {
     return this.db.select().from(hhListItems).where(eq(hhListItems.id, itemId)).get();
   }
 
-  async assignItem(itemId: number, dto: AssignListItemDto) {
+  async assignItem(itemId: number, familyId: number, dto: AssignListItemDto) {
+    const item = await this.db.select().from(hhListItems)
+      .where(eq(hhListItems.id, itemId)).get();
+    if (!item) throw new NotFoundException('条目不存在');
+    const list = await this.db.select().from(hhLists)
+      .where(and(eq(hhLists.id, item.listId), eq(hhLists.familyId, familyId))).get();
+    if (!list) throw new NotFoundException('清单不存在');
+
     await this.db.update(hhListItems).set({
       assigneeId: dto.assigneeId,
     }).where(eq(hhListItems.id, itemId)).run();
@@ -248,8 +275,8 @@ export class ListsService {
   }
 
   // === 自动补货 ===
-  async autoReplenish(familyId: number) {
-    // 查询低于阈值的物品
+  async autoReplenish(familyId: number, userId: number) {
+    // 查询低于阈值的物品（批量）
     const lowStockItems = await this.db.select().from(invItems)
       .where(and(
         eq(invItems.familyId, familyId),
@@ -271,34 +298,42 @@ export class ListsService {
       .get();
 
     if (!shoppingList) {
-      shoppingList = await this.create(familyId, 1, {
+      shoppingList = await this.create(familyId, userId, {
         name: '自动补货清单',
         type: 'shopping',
       });
     }
 
-    let addedCount = 0;
-    for (const item of lowStockItems) {
-      // 检查是否已在清单中
-      const existing = await this.db.select().from(hhListItems)
+    // 批量查询已在清单中的低库存物品，避免 N+1
+    const lowStockIds = lowStockItems.map((i: any) => i.id);
+    let existingItems: any[];
+    if (lowStockIds.length > 0) {
+      existingItems = await this.db.select()
+        .from(hhListItems)
         .where(and(
           eq(hhListItems.listId, shoppingList.id),
-          eq(hhListItems.linkedItemId, item.id),
           eq(hhListItems.status, 'pending'),
+          inArray(hhListItems.linkedItemId, lowStockIds),
         ))
-        .get();
+        .all();
+    } else {
+      existingItems = [];
+    }
+    const existingIds = new Set(existingItems.map(e => e.linkedItemId));
 
-      if (!existing) {
-        const needed = item.minStock - item.quantity;
-        await this.addItem(shoppingList.id, familyId, {
-          content: item.name,
-          quantity: needed,
-          unit: item.unit,
-          linkedItemId: item.id,
-          notes: `库存 ${item.quantity}${item.unit}，低于阈值 ${item.minStock}${item.unit}`,
-        });
-        addedCount++;
-      }
+    let addedCount = 0;
+    for (const item of lowStockItems) {
+      if (existingIds.has(item.id)) continue;
+
+      const needed = item.minStock - item.quantity;
+      await this.addItem(shoppingList.id, familyId, {
+        content: item.name,
+        quantity: needed,
+        unit: item.unit,
+        linkedItemId: item.id,
+        notes: `库存 ${item.quantity}${item.unit}，低于阈值 ${item.minStock}${item.unit}`,
+      });
+      addedCount++;
     }
 
     return {

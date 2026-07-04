@@ -48,19 +48,19 @@ export class ListsController {
     return this.listsService.delete(parseInt(id), req.user.familyId);
   }
 
-  @Post(':id/invItems')
+  @Post(':id/items')
   addItem(@Param('id') id: string, @Request() req: any, @Body() dto: AddListItemDto) {
     return this.listsService.addItem(parseInt(id), req.user.familyId, dto);
   }
 
   @Put('items/:itemId')
-  updateItem(@Param('itemId') itemId: string, @Body() dto: UpdateListItemDto) {
-    return this.listsService.updateItem(parseInt(itemId), dto);
+  updateItem(@Param('itemId') itemId: string, @Request() req: any, @Body() dto: UpdateListItemDto) {
+    return this.listsService.updateItem(parseInt(itemId), req.user.familyId, dto);
   }
 
   @Delete('items/:itemId')
-  deleteItem(@Param('itemId') itemId: string) {
-    return this.listsService.deleteItem(parseInt(itemId));
+  deleteItem(@Param('itemId') itemId: string, @Request() req: any) {
+    return this.listsService.deleteItem(parseInt(itemId), req.user.familyId);
   }
 
   @Post('items/:itemId/check')
@@ -69,13 +69,13 @@ export class ListsController {
   }
 
   @Post('items/:itemId/uncheck')
-  uncheckItem(@Param('itemId') itemId: string) {
-    return this.listsService.uncheckItem(parseInt(itemId));
+  uncheckItem(@Param('itemId') itemId: string, @Request() req: any) {
+    return this.listsService.uncheckItem(parseInt(itemId), req.user.familyId);
   }
 
   @Post('items/:itemId/assign')
-  assignItem(@Param('itemId') itemId: string, @Body() dto: AssignListItemDto) {
-    return this.listsService.assignItem(parseInt(itemId), dto);
+  assignItem(@Param('itemId') itemId: string, @Request() req: any, @Body() dto: AssignListItemDto) {
+    return this.listsService.assignItem(parseInt(itemId), req.user.familyId, dto);
   }
 
   @Get('items/:itemId/comments')
@@ -95,6 +95,6 @@ export class ListsController {
 
   @Post('auto-replenish')
   autoReplenish(@Request() req: any) {
-    return this.listsService.autoReplenish(req.user.familyId);
+    return this.listsService.autoReplenish(req.user.familyId, req.user.id);
   }
 }

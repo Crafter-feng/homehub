@@ -35,14 +35,17 @@ function parseArgs(): {
     switch (args[i]) {
       case '--input':
       case '-i':
+        if (i + 1 >= args.length) { console.error(`错误: ${args[i]} 需要一个值`); process.exit(1); }
         result.input = args[++i];
         break;
       case '--output':
       case '-o':
+        if (i + 1 >= args.length) { console.error(`错误: ${args[i]} 需要一个值`); process.exit(1); }
         result.output = args[++i];
         break;
       case '--family-id':
       case '-f':
+        if (i + 1 >= args.length) { console.error(`错误: ${args[i]} 需要一个值`); process.exit(1); }
         result.familyId = parseInt(args[++i], 10) || 1;
         break;
       case '--dry-run':
@@ -55,6 +58,10 @@ function parseArgs(): {
       case '-h':
         result.help = true;
         break;
+      default:
+        console.error(`错误: 未知参数 ${args[i]}`);
+        console.error('使用 --help 查看帮助');
+        process.exit(1);
     }
   }
 

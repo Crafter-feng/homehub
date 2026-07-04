@@ -63,7 +63,6 @@ export type RecipeSelect = InferSelectModel<typeof schema.hhRecipes>;
 // ── system ──
 export type TriggerBindingSelect = InferSelectModel<typeof schema.sysTriggerBindings>;
 export type NfcTagStateSelect = InferSelectModel<typeof schema.sysNfcTagState>;
-export type ScanLogSelect = InferSelectModel<typeof schema.sysScanLogs>;
 export type AutomationTriggerSelect = InferSelectModel<typeof schema.sysAutomationTriggers>;
 export type NotificationRuleSelect = InferSelectModel<typeof schema.sysNotificationRules>;
 export type NotificationSelect = InferSelectModel<typeof schema.sysNotifications>;

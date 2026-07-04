@@ -300,7 +300,7 @@ export class McpService {
     const historyMatch = resolvedPath.match(/^\/v1\/stock\/invItems\/(\d+)\/history$/);
     if (historyMatch && method === 'GET') {
       const itemId = parseInt(historyMatch[1], 10);
-      return this.stockService.getHistory(itemId);
+      return this.stockService.getHistory(itemId, familyId);
     }
 
     // GET /v1/stock/summary → get_stock_summary
@@ -380,7 +380,7 @@ export class McpService {
     const updateListItemMatch = resolvedPath.match(/^\/v1\/hhLists\/invItems\/(\d+)$/);
     if (updateListItemMatch && method === 'PUT') {
       const itemId = parseInt(updateListItemMatch[1], 10);
-      return this.listsService.updateItem(itemId, {
+      return this.listsService.updateItem(itemId, familyId, {
         content: params.content,
         quantity: params.quantity,
         notes: params.notes,
@@ -391,7 +391,7 @@ export class McpService {
     const deleteListItemMatch = resolvedPath.match(/^\/v1\/hhLists\/invItems\/(\d+)$/);
     if (deleteListItemMatch && method === 'DELETE') {
       const itemId = parseInt(deleteListItemMatch[1], 10);
-      return this.listsService.deleteItem(itemId);
+      return this.listsService.deleteItem(itemId, familyId);
     }
 
     // POST /v1/hhLists/invItems/{id}/check → check_list_item
@@ -405,14 +405,14 @@ export class McpService {
     const uncheckMatch = resolvedPath.match(/^\/v1\/hhLists\/invItems\/(\d+)\/uncheck$/);
     if (uncheckMatch && method === 'POST') {
       const itemId = parseInt(uncheckMatch[1], 10);
-      return this.listsService.uncheckItem(itemId);
+      return this.listsService.uncheckItem(itemId, familyId);
     }
 
     // POST /v1/hhLists/invItems/{id}/assign → assign_list_item
     const assignMatch = resolvedPath.match(/^\/v1\/hhLists\/invItems\/(\d+)\/assign$/);
     if (assignMatch && method === 'POST') {
       const itemId = parseInt(assignMatch[1], 10);
-      return this.listsService.assignItem(itemId, {
+      return this.listsService.assignItem(itemId, familyId, {
         assigneeId: parseInt(params.assignee_id, 10),
       });
     }
@@ -424,7 +424,7 @@ export class McpService {
 
     // POST /v1/hhLists/auto-replenish → auto_replenish
     if (resolvedPath === '/v1/hhLists/auto-replenish' && method === 'POST') {
-      return this.listsService.autoReplenish(familyId);
+      return this.listsService.autoReplenish(familyId, userId);
     }
 
     throw new Error(`未知的 Lists API 路径: ${resolvedPath} (${method})`);

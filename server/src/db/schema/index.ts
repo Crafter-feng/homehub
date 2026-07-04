@@ -22,7 +22,7 @@ export {
 // ── 系统（扫码/触发器/通知/插件） ──
 export {
   sysTriggerBindings, sysNfcTagState, sysRfidReaders, sysRfidZones,
-  sysAutomationTriggers, sysScanLogs, sysEncoderJobs,
+  sysAutomationTriggers, sysEncoderJobs,
   sysNotificationRules, sysNotifications,
   sysPluginData,
 } from './system';

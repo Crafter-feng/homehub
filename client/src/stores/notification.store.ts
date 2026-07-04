@@ -6,20 +6,27 @@ export const useNotificationStore = defineStore('notifications', () => {
   const notifications = ref<any[]>([]);
   const unreadCount = ref(0);
   const loading = ref(false);
+  const error = ref<string | null>(null);
 
   async function fetchNotifications(unreadOnly?: boolean) {
     loading.value = true;
     try {
       const { data } = await notificationsApi.list(unreadOnly);
       notifications.value = data;
+    } catch {
+      error.value = 'Failed to load notifications';
     } finally {
       loading.value = false;
     }
   }
 
   async function fetchUnreadCount() {
-    const { data } = await notificationsApi.getUnreadCount();
-    unreadCount.value = data.count;
+    try {
+      const { data } = await notificationsApi.getUnreadCount();
+      unreadCount.value = data.count || 0;
+    } catch {
+      // Silently ignore — unread count is non-critical
+    }
   }
 
   async function markAsRead(id: number) {
@@ -41,6 +48,7 @@ export const useNotificationStore = defineStore('notifications', () => {
     notifications,
     unreadCount,
     loading,
+    error,
     fetchNotifications,
     fetchUnreadCount,
     markAsRead,

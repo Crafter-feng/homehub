@@ -9,6 +9,7 @@ import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { CreateApiTokenDto } from './dto/create-api-token.dto';
 import { createHash, randomBytes } from 'crypto';
+import { JWT_SECRET, JWT_REFRESH_SECRET } from './auth.constants';
 
 @Injectable()
 export class AuthService {
@@ -27,28 +28,29 @@ export class AuthService {
     }
 
     const passwordHash = await bcrypt.hash(dto.password, 10);
-    const result = await this.db.insert(users).values({
-      name: dto.name,
-      email: dto.email,
-      passwordHash,
-    }).returning().get();
 
-    // 创建默认家庭
-    const familyCode = randomBytes(4).toString('hex');
-    const family = await this.db.insert(families).values({
-      name: `${dto.name}的家`,
-      inviteCode: familyCode,
-    }).returning().get();
+    return this.db.transaction(async (tx: any) => {
+      const result = await tx.insert(users).values({
+        name: dto.name,
+        email: dto.email,
+        passwordHash,
+      }).returning().get();
 
-    // 将用户添加为家庭管理员
-    await this.db.insert(familyMembers).values({
-      userId: result.id,
-      familyId: family.id,
-      role: 'admin',
+      const familyCode = randomBytes(4).toString('hex');
+      const family = await tx.insert(families).values({
+        name: `${dto.name}的家`,
+        inviteCode: familyCode,
+      }).returning().get();
+
+      await tx.insert(familyMembers).values({
+        userId: result.id,
+        familyId: family.id,
+        role: 'admin',
+      });
+
+      this.logger.log(`用户注册成功: ${dto.email} (ID: ${result.id})`);
+      return this.generateTokens(result.id, result.email, family.id);
     });
-
-    this.logger.log(`用户注册成功: ${dto.email} (ID: ${result.id})`);
-    return this.generateTokens(result.id, result.email, family.id);
   }
 
   async login(dto: LoginDto) {
@@ -167,8 +169,8 @@ export class AuthService {
   }
 
   private generateTokens(userId: number, email: string, familyId?: number) {
-    const accessSecret = this.configService.get('JWT_SECRET', 'homehub-dev-secret-change-in-production');
-    const refreshSecret = this.configService.get('JWT_REFRESH_SECRET', 'homehub-dev-refresh-secret-change-in-production');
+    const accessSecret = this.configService.get('JWT_SECRET', JWT_SECRET);
+    const refreshSecret = this.configService.get('JWT_REFRESH_SECRET', JWT_REFRESH_SECRET);
 
     const accessToken = this.jwtService.sign(
       { sub: userId, email, familyId },

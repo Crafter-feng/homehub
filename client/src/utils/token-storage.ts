@@ -1,6 +1,6 @@
 import CryptoJS from 'crypto-js';
 
-const ENCRYPT_KEY = 'hh-tk-enc-2026'; // Should be moved to environment variable in production
+const ENCRYPT_KEY = import.meta.env.VITE_TOKEN_ENCRYPT_KEY || 'hh-tk-enc-2026-dev';
 
 export const TokenStorage = {
   /** Retrieve and decrypt the access token from localStorage */

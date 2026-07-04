@@ -266,9 +266,11 @@ export class StockService {
     });
   }
 
-  async getHistory(itemId: number) {
+  async getHistory(itemId: number, familyId: number) {
     return this.db.select().from(invStockTransactions)
-      .where(eq(invStockTransactions.itemId, itemId))
+      .where(and(
+        eq(invStockTransactions.itemId, itemId),
+      ))
       .orderBy(desc(invStockTransactions.createdAt))
       .all();
   }
