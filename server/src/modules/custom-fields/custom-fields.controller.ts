@@ -51,38 +51,42 @@ export class CustomFieldsController {
 
   @Get(':entityType/:entityId/values')
   getValues(
+    @Request() req: any,
     @Param('entityType') entityType: string,
     @Param('entityId') entityId: string,
   ) {
-    return this.customFieldsService.getValues(entityType, parseInt(entityId));
+    return this.customFieldsService.getValues(req.user.familyId, entityType, parseInt(entityId));
   }
 
   @Put(':entityType/:entityId/values')
   setValues(
+    @Request() req: any,
     @Param('entityType') entityType: string,
     @Param('entityId') entityId: string,
     @Body() dto: BatchSetValuesDto,
   ) {
-    return this.customFieldsService.setValues(entityType, parseInt(entityId), dto.values);
+    return this.customFieldsService.setValues(req.user.familyId, entityType, parseInt(entityId), dto.values);
   }
 
   @Get(':entityType/:entityId/values/:fieldName')
   getValue(
+    @Request() req: any,
     @Param('entityType') entityType: string,
     @Param('entityId') entityId: string,
     @Param('fieldName') fieldName: string,
   ) {
-    return this.customFieldsService.getValue(entityType, parseInt(entityId), fieldName);
+    return this.customFieldsService.getValue(req.user.familyId, entityType, parseInt(entityId), fieldName);
   }
 
   @Put(':entityType/:entityId/values/:fieldName')
   setValue(
+    @Request() req: any,
     @Param('entityType') entityType: string,
     @Param('entityId') entityId: string,
     @Param('fieldName') fieldName: string,
     @Body('value') value: any,
   ) {
-    return this.customFieldsService.setValue(entityType, parseInt(entityId), fieldName, value);
+    return this.customFieldsService.setValue(req.user.familyId, entityType, parseInt(entityId), fieldName, value);
   }
 
   // === 查询 ===

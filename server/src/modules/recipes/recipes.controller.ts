@@ -13,6 +13,11 @@ export class RecipesController {
     return this.recipesService.list(req.user.familyId, query);
   }
 
+  @Get('export')
+  exportRecipes(@Request() req: any) {
+    return this.recipesService.exportRecipes(req.user.familyId);
+  }
+
   @Get('recommendations')
   getRecommendations(@Request() req: any, @Query('limit') limit?: string) {
     return this.recipesService.getRecommendations(req.user.familyId, limit ? parseInt(limit) : 5);
@@ -24,28 +29,8 @@ export class RecipesController {
   }
 
   @Get(':id')
-  getRecipe(@Param('id') id: string) {
-    return this.recipesService.getById(parseInt(id));
-  }
-
-  @Post()
-  createRecipe(@Request() req: any, @Body() dto: CreateRecipeDto) {
-    return this.recipesService.create(req.user.familyId, dto);
-  }
-
-  @Put(':id')
-  updateRecipe(@Param('id') id: string, @Request() req: any, @Body() dto: UpdateRecipeDto) {
-    return this.recipesService.update(parseInt(id), req.user.familyId, dto);
-  }
-
-  @Delete(':id')
-  deleteRecipe(@Param('id') id: string, @Request() req: any) {
-    return this.recipesService.delete(parseInt(id), req.user.familyId);
-  }
-
-  @Get('export')
-  exportRecipes(@Request() req: any) {
-    return this.recipesService.exportRecipes(req.user.familyId);
+  getRecipe(@Param('id') id: string, @Request() req: any) {
+    return this.recipesService.getById(parseInt(id), req.user.familyId);
   }
 
   @Post('import')

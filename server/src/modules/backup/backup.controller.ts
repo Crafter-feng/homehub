@@ -1,10 +1,11 @@
-import { Controller, Get, Post, Delete, Body, Param, Request, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Body, Param, Request, UseGuards, BadRequestException } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { AdminGuard } from '../../common/guards/admin.guard';
 import { BackupService, BackupManifest } from './backup.service';
 import { CreateBackupDto, RestoreBackupDto } from './dto/backup.dto';
 
 @Controller('backup')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, AdminGuard)
 export class BackupController {
   constructor(private readonly backupService: BackupService) {}
 

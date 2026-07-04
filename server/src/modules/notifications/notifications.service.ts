@@ -1,13 +1,16 @@
-import { Injectable, Inject, NotFoundException } from '@nestjs/common';
+import { Injectable, Inject, NotFoundException, Logger } from '@nestjs/common';
 import { DATABASE_TOKEN } from '../../db/database.module';
 import { eq, and, sql, desc } from 'drizzle-orm';
 import { sysNotificationRules, sysNotifications, invItems } from '../../db/schema';
 import { CreateNotificationRuleDto, UpdateNotificationRuleDto } from './dto/notification.dto';
 import * as http from 'http';
 import * as https from 'https';
+import * as net from 'net';
+import * as dns from 'dns';
 
 @Injectable()
 export class NotificationsService {
+  private readonly logger = new Logger(NotificationsService.name);
   constructor(
     @Inject(DATABASE_TOKEN) private readonly db: any,
   ) {}
@@ -154,20 +157,29 @@ export class NotificationsService {
       ))
       .all();
 
+    const nowSeconds = Math.floor(Date.now() / 1000);
+
     // Query expiring invItems
     const expiringItems = await this.db.select().from(invItems)
       .where(and(
         eq(invItems.familyId, familyId),
-        sql`${invItems.expiryDate} > ${Date.now()}`,
-        sql`${invItems.expiryDate} <= ${Date.now() + 7 * 86400000}`,
+        sql`${invItems.expiryDate} > ${nowSeconds}`,
+        sql`${invItems.expiryDate} <= ${nowSeconds + 7 * 86400}`,
       ))
       .all();
 
     const expiredItems = await this.db.select().from(invItems)
       .where(and(
         eq(invItems.familyId, familyId),
-        sql`${invItems.expiryDate} <= ${Date.now()}`,
+        sql`${invItems.expiryDate} <= ${nowSeconds}`,
       ))
+      .all();
+
+    // Get family members to notify
+    const { familyMembers } = await import('../../db/schema');
+    const members = await this.db.select({ userId: familyMembers.userId })
+      .from(familyMembers)
+      .where(eq(familyMembers.familyId, familyId))
       .all();
 
     for (const rule of rules) {
@@ -180,16 +192,19 @@ export class NotificationsService {
           `• ${i.name}（${i.quantity}${i.unit}）过期: ${i.expiryDate ? new Date(i.expiryDate).toLocaleDateString('zh-CN') : '未知'}`
         ).join('\n');
 
-        // Create in-app notification
-        await this.createNotification({
-          familyId,
-          title,
-          message,
-          type: 'expiry',
-          relatedType: 'expiry_check',
-        });
+        // Create in-app notification for each family member
+        for (const member of members) {
+          await this.createNotification({
+            familyId,
+            userId: member.userId,
+            title,
+            message,
+            type: 'expiry',
+            relatedType: 'expiry_check',
+          });
+        }
 
-        // Send webhook if configured
+        // Send webhook if configured (once, not per member)
         if (rule.channel === 'webhook' && config?.webhookUrl) {
           await this.sendWebhook(config.webhookUrl, {
             title,
@@ -216,6 +231,58 @@ export class NotificationsService {
   async sendWebhook(webhookUrl: string, payload: Record<string, any>): Promise<boolean> {
     try {
       const url = new URL(webhookUrl);
+
+      // SSRF protection: only http/https protocols
+      if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+        this.logger.warn(`Webhook URL 协议不允许: ${url.protocol}`);
+        return false;
+      }
+
+      // SSRF protection: block private/reserved IPs
+      const hostname = url.hostname.toLowerCase();
+      const isPrivate =
+        hostname === 'localhost' ||
+        hostname === '127.0.0.1' ||
+        hostname === '::1' ||
+        hostname.endsWith('.local') ||
+        hostname.endsWith('.internal') ||
+        /^10\./.test(hostname) ||
+        /^172\.(1[6-9]|2\d|3[01])\./.test(hostname) ||
+        /^192\.168\./.test(hostname) ||
+        /^169\.254\./.test(hostname) ||
+        /^0\./.test(hostname) ||
+        /^127\./.test(hostname);
+
+      if (isPrivate) {
+        this.logger.warn(`Webhook URL 指向内网地址: ${hostname}`);
+        return false;
+      }
+
+      // DNS-based SSRF protection: resolve and check
+      try {
+        const addresses = await this.resolveHostname(hostname);
+        for (const addr of addresses) {
+          if (net.isIPv4(addr)) {
+            if (
+              addr === '127.0.0.1' ||
+              /^10\./.test(addr) ||
+              /^172\.(1[6-9]|2\d|3[01])\./.test(addr) ||
+              /^192\.168\./.test(addr) ||
+              /^169\.254\./.test(addr) ||
+              /^0\./.test(addr) ||
+              /^127\./.test(addr)
+            ) {
+              this.logger.warn(`Webhook URL 解析到内网地址: ${addr}`);
+              return false;
+            }
+          }
+        }
+      } catch {
+        // DNS resolution failed — reject to be safe
+        this.logger.warn(`Webhook URL DNS 解析失败: ${hostname}`);
+        return false;
+      }
+
       const isHttps = url.protocol === 'https:';
       const postData = JSON.stringify(payload);
       const lib = isHttps ? https : http;
@@ -241,20 +308,20 @@ export class NotificationsService {
             if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
               resolve(true);
             } else {
-              console.warn(`Webhook ${webhookUrl} returned ${res.statusCode}: ${body.substring(0, 200)}`);
+              this.logger.warn(`Webhook ${webhookUrl} returned ${res.statusCode}: ${body.substring(0, 200)}`);
               resolve(false);
             }
           });
         });
 
         req.on('error', (err) => {
-          console.warn(`Webhook ${webhookUrl} error: ${err.message}`);
+          this.logger.warn(`Webhook ${webhookUrl} error: ${err.message}`);
           resolve(false);
         });
 
         req.on('timeout', () => {
           req.destroy();
-          console.warn(`Webhook ${webhookUrl} timeout`);
+          this.logger.warn(`Webhook ${webhookUrl} timeout`);
           resolve(false);
         });
 
@@ -262,8 +329,21 @@ export class NotificationsService {
         req.end();
       });
     } catch (err: any) {
-      console.warn(`Webhook ${webhookUrl} parse error: ${err.message}`);
+      this.logger.warn(`Webhook ${webhookUrl} parse error: ${err.message}`);
       return false;
     }
+  }
+
+  private resolveHostname(hostname: string): Promise<string[]> {
+    return new Promise((resolve, reject) => {
+      if (net.isIPv4(hostname) || net.isIPv6(hostname)) {
+        resolve([hostname]);
+        return;
+      }
+      dns.resolve4(hostname, (err: any, addresses: string[]) => {
+        if (err) reject(err);
+        else resolve(addresses);
+      });
+    });
   }
 }

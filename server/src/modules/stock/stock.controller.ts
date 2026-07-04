@@ -39,8 +39,8 @@ export class StockController {
   }
 
   @Get('items/:id')
-  getItem(@Param('id') id: string) {
-    return this.stockService.getById(parseInt(id));
+  getItem(@Param('id') id: string, @Request() req: AuthedRequest) {
+    return this.stockService.getById(parseInt(id), req.user.familyId);
   }
 
   @Post('items')
@@ -104,13 +104,13 @@ export class StockController {
   }
 
   @Get('items/:id/batches')
-  listBatches(@Param('id') id: string) {
-    return this.stockService.listBatches(parseInt(id));
+  listBatches(@Param('id') id: string, @Request() req: AuthedRequest) {
+    return this.stockService.listBatches(parseInt(id), req.user.familyId);
   }
 
   @Get('items/:id/batches/summary')
-  getBatchSummary(@Param('id') id: string) {
-    return this.stockService.getBatchSummary(parseInt(id));
+  getBatchSummary(@Param('id') id: string, @Request() req: AuthedRequest) {
+    return this.stockService.getBatchSummary(parseInt(id), req.user.familyId);
   }
 
   @Put('items/batches/:batchId')

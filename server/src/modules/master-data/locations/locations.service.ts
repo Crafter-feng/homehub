@@ -2,16 +2,7 @@ import { Injectable, Inject, NotFoundException } from '@nestjs/common';
 import { DATABASE_TOKEN } from '../../../db/database.module';
 import { eq, and } from 'drizzle-orm';
 import { mdLocations, invItems } from '../../../db/schema';
-
-export class CreateLocationDto {
-  name: string;
-  parentId?: number;
-  level?: number;
-  image?: string;
-  notes?: string;
-}
-
-export class UpdateLocationDto extends CreateLocationDto {}
+import { CreateLocationDto, UpdateLocationDto } from './dto/location.dto';
 
 @Injectable()
 export class LocationsService {

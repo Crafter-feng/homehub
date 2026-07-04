@@ -51,8 +51,8 @@ export class ScannerController {
    * GET /api/v1/scanner/nfc/tag/:tagUid
    */
   @Get('nfc/tag/:tagUid')
-  getNfcTagState(@Param('tagUid') tagUid: string) {
-    return this.scannerService.getNfcTagState(tagUid);
+  getNfcTagState(@Param('tagUid') tagUid: string, @Request() req: any) {
+    return this.scannerService.getNfcTagState(tagUid, req.user.familyId);
   }
 
   /**

@@ -1,6 +1,6 @@
 import { Injectable, Inject } from '@nestjs/common';
 import { DATABASE_TOKEN } from '../../db/database.module';
-import { eq, and, desc, sql, like, gte, lte } from 'drizzle-orm';
+import { eq, and, desc, sql, like, gte, lte, inArray } from 'drizzle-orm';
 import { invStockTransactions, invItems, hhLists, hhListItems, sysAutomationTriggers, mdCategories, mdLocations, users } from '../../db/schema';
 
 @Injectable()
@@ -83,26 +83,29 @@ export class DashboardService {
   }
 
   async getStockSummary(familyId: number) {
+    const nowSeconds = Math.floor(Date.now() / 1000);
+
     const total = await this.db.select({ count: sql<number>`count(*)` })
       .from(invItems).where(eq(invItems.familyId, familyId)).get();
 
     const expiring = await this.db.select({ count: sql<number>`count(*)` })
       .from(invItems).where(and(
         eq(invItems.familyId, familyId),
-        sql`${invItems.expiryDate} <= ${Date.now() + 7 * 86400000}`,
-        sql`${invItems.expiryDate} > ${Date.now()}`,
+        sql`${invItems.expiryDate} <= ${nowSeconds + 7 * 86400}`,
+        sql`${invItems.expiryDate} > ${nowSeconds}`,
       )).get();
 
     const expired = await this.db.select({ count: sql<number>`count(*)` })
       .from(invItems).where(and(
         eq(invItems.familyId, familyId),
-        sql`${invItems.expiryDate} <= ${Date.now()}`,
+        sql`${invItems.expiryDate} <= ${nowSeconds}`,
       )).get();
 
     // 本月消耗
     const monthStart = new Date();
     monthStart.setDate(1);
     monthStart.setHours(0, 0, 0, 0);
+    const monthStartSeconds = Math.floor(monthStart.getTime() / 1000);
 
     const monthConsumption = await this.db.select({ count: sql<number>`count(*)` })
       .from(invStockTransactions)
@@ -110,7 +113,7 @@ export class DashboardService {
       .where(and(
         eq(invItems.familyId, familyId),
         eq(invStockTransactions.type, 'consume'),
-        sql`${invStockTransactions.createdAt} >= ${monthStart.getTime()}`,
+        sql`${invStockTransactions.createdAt} >= ${monthStartSeconds}`,
       )).get();
 
     // 待办任务
@@ -176,7 +179,7 @@ export class DashboardService {
         id: mdCategories.id,
         name: mdCategories.name,
       }).from(mdCategories)
-        .where(sql`${mdCategories.id} IN (${sql.raw(categoryIds.join(','))})`)
+        .where(inArray(mdCategories.id, categoryIds))
         .all();
       for (const c of cats) {
         categoryMap[c.id] = c.name;
@@ -296,7 +299,7 @@ export class DashboardService {
         id: mdCategories.id,
         name: mdCategories.name,
       }).from(mdCategories)
-        .where(sql`${mdCategories.id} IN (${sql.raw(categoryIds.join(','))})`)
+        .where(inArray(mdCategories.id, categoryIds))
         .all();
       for (const c of cats) {
         categoryMap[c.id] = c.name;
@@ -392,7 +395,7 @@ export class DashboardService {
     const locIds = Array.from(locationMap.keys()).filter(id => id > 0);
     if (locIds.length > 0) {
       const locs = await this.db.select().from(mdLocations)
-        .where(sql`${mdLocations.id} IN (${sql.raw(locIds.join(','))})`)
+        .where(inArray(mdLocations.id, locIds))
         .all();
       for (const loc of locs) {
         const group = locationMap.get(loc.id);

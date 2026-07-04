@@ -24,9 +24,9 @@ export class RecipesService {
       .all();
   }
 
-  async getById(recipeId: number) {
+  async getById(recipeId: number, familyId: number) {
     const recipe = await this.db.select().from(hhRecipes)
-      .where(eq(hhRecipes.id, recipeId))
+      .where(and(eq(hhRecipes.id, recipeId), eq(hhRecipes.familyId, familyId)))
       .get();
     if (!recipe) throw new NotFoundException('食谱不存在');
     return recipe;
@@ -65,7 +65,7 @@ export class RecipesService {
       source: dto.source,
     }).where(eq(hhRecipes.id, recipeId)).run();
 
-    return this.getById(recipeId);
+    return this.getById(recipeId, familyId);
   }
 
   async delete(recipeId: number, familyId: number) {
@@ -212,7 +212,7 @@ export class RecipesService {
    * 分数越高，表示该食谱使用的临期食材越多
    */
   async getDueScore(recipeId: number, familyId: number): Promise<number> {
-    const recipe = await this.getById(recipeId);
+    const recipe = await this.getById(recipeId, familyId);
     if (!recipe) return 0;
 
     const ingredients = (recipe.ingredients as any[]) || [];

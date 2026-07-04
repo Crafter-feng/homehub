@@ -28,10 +28,19 @@ export class FamiliesService {
     return family;
   }
 
-  async getById(familyId: number) {
+  async getById(familyId: number, userId: number) {
+    await this.requireMember(userId, familyId);
     const family = await this.db.select().from(families).where(eq(families.id, familyId)).get();
     if (!family) throw new NotFoundException('家庭不存在');
-    return family;
+    // Strip invite code from response for non-admin members
+    const member = await this.db.select().from(familyMembers)
+      .where(and(eq(familyMembers.userId, userId), eq(familyMembers.familyId, familyId)))
+      .get();
+    if (member?.role !== 'admin') {
+      const { inviteCode, ...safe } = family;
+      return { ...safe, role: member?.role };
+    }
+    return { ...family, role: member?.role };
   }
 
   async update(familyId: number, userId: number, dto: UpdateFamilyDto) {
@@ -41,7 +50,7 @@ export class FamiliesService {
     if (dto.name) updates.name = dto.name;
 
     await this.db.update(families).set(updates).where(eq(families.id, familyId)).run();
-    return this.getById(familyId);
+    return this.getById(familyId, userId);
   }
 
   async regenerateInviteCode(familyId: number, userId: number) {
@@ -49,7 +58,7 @@ export class FamiliesService {
 
     const inviteCode = randomBytes(4).toString('hex');
     await this.db.update(families).set({ inviteCode }).where(eq(families.id, familyId)).run();
-    return this.getById(familyId);
+    return this.getById(familyId, userId);
   }
 
   async join(userId: number, dto: JoinFamilyDto) {
@@ -99,8 +108,9 @@ export class FamiliesService {
   async updateMemberRole(familyId: number, userId: number, memberId: number, dto: UpdateMemberRoleDto) {
     await this.requireRole(userId, familyId, 'admin');
 
-    // 不能修改自己的角色
-    const member = await this.db.select().from(familyMembers).where(eq(familyMembers.id, memberId)).get();
+    const member = await this.db.select().from(familyMembers)
+      .where(and(eq(familyMembers.id, memberId), eq(familyMembers.familyId, familyId)))
+      .get();
     if (!member) throw new NotFoundException('成员不存在');
     if (member.userId === userId) {
       throw new ForbiddenException('不能修改自己的角色');
@@ -117,7 +127,9 @@ export class FamiliesService {
   async removeMember(familyId: number, userId: number, memberId: number) {
     await this.requireRole(userId, familyId, 'admin');
 
-    const member = await this.db.select().from(familyMembers).where(eq(familyMembers.id, memberId)).get();
+    const member = await this.db.select().from(familyMembers)
+      .where(and(eq(familyMembers.id, memberId), eq(familyMembers.familyId, familyId)))
+      .get();
     if (!member) throw new NotFoundException('成员不存在');
     if (member.userId === userId) {
       throw new ForbiddenException('不能移除自己');

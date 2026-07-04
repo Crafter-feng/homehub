@@ -65,7 +65,7 @@ export class ListsController {
 
   @Post('items/:itemId/check')
   checkItem(@Param('itemId') itemId: string, @Request() req: any) {
-    return this.listsService.checkItem(parseInt(itemId), req.user.id);
+    return this.listsService.checkItem(parseInt(itemId), req.user.id, req.user.familyId);
   }
 
   @Post('items/:itemId/uncheck')

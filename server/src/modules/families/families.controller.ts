@@ -19,8 +19,8 @@ export class FamiliesController {
   }
 
   @Get(':id')
-  getById(@Param('id') id: string) {
-    return this.familiesService.getById(parseInt(id));
+  getById(@Param('id') id: string, @Request() req: any) {
+    return this.familiesService.getById(parseInt(id), req.user.id);
   }
 
   @Put(':id')

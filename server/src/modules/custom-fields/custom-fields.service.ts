@@ -98,9 +98,12 @@ export class CustomFieldsService {
 
   // === 字段值管理 ===
 
-  async getValues(entityType: string, entityId: number) {
+  async getValues(familyId: number, entityType: string, entityId: number) {
     const fields = await this.db.select().from(sysCustomFields)
-      .where(eq(sysCustomFields.entityType, entityType))
+      .where(and(
+        eq(sysCustomFields.familyId, familyId),
+        eq(sysCustomFields.entityType, entityType),
+      ))
       .all();
 
     const values = await this.db.select().from(sysCustomValues)
@@ -125,10 +128,12 @@ export class CustomFieldsService {
     });
   }
 
-  async setValues(entityType: string, entityId: number, values: SetFieldValueDto[]) {
-    // Get field definitions for validation
+  async setValues(familyId: number, entityType: string, entityId: number, values: SetFieldValueDto[]) {
     const fields = await this.db.select().from(sysCustomFields)
-      .where(eq(sysCustomFields.entityType, entityType))
+      .where(and(
+        eq(sysCustomFields.familyId, familyId),
+        eq(sysCustomFields.entityType, entityType),
+      ))
       .all();
 
     const fieldMap = new Map(fields.map((f: any) => [f.fieldName, f]));
@@ -169,9 +174,10 @@ export class CustomFieldsService {
     return { success: true };
   }
 
-  async getValue(entityType: string, entityId: number, fieldName: string) {
+  async getValue(familyId: number, entityType: string, entityId: number, fieldName: string) {
     const field = await this.db.select().from(sysCustomFields)
       .where(and(
+        eq(sysCustomFields.familyId, familyId),
         eq(sysCustomFields.entityType, entityType),
         eq(sysCustomFields.fieldName, fieldName),
       ))
@@ -190,9 +196,10 @@ export class CustomFieldsService {
     return value?.value || field.fieldConfig?.defaultValue || null;
   }
 
-  async setValue(entityType: string, entityId: number, fieldName: string, value: any) {
+  async setValue(familyId: number, entityType: string, entityId: number, fieldName: string, value: any) {
     const field = await this.db.select().from(sysCustomFields)
       .where(and(
+        eq(sysCustomFields.familyId, familyId),
         eq(sysCustomFields.entityType, entityType),
         eq(sysCustomFields.fieldName, fieldName),
       ))

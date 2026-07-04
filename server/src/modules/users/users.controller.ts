@@ -1,10 +1,9 @@
-import { Controller, Get, Put, Post, Body, Request, UseGuards, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { Controller, Get, Put, Post, Body, Request, UseGuards, UploadedFile, UseInterceptors, BadRequestException } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { UsersService } from './users.service';
 import { UpdateProfileDto, ChangePasswordDto } from './dto/update-profile.dto';
 import { diskStorage } from 'multer';
-import { extname } from 'path';
 
 @Controller('users')
 @UseGuards(JwtAuthGuard)
@@ -31,13 +30,22 @@ export class UsersController {
     storage: diskStorage({
       destination: './uploads/avatars',
       filename: (req: any, file: any, cb: any) => {
-        const uniqueSuffix = `${req.user.id}-${Date.now()}${extname(file.originalname)}`;
+        // Derive extension from mimetype, NOT from originalname (prevents .html/.svg uploads)
+        const extMap: Record<string, string> = {
+          'image/jpeg': '.jpg',
+          'image/png': '.png',
+          'image/gif': '.gif',
+          'image/webp': '.webp',
+        };
+        const ext = extMap[file.mimetype] || '.jpg';
+        const uniqueSuffix = `${req.user.id}-${Date.now()}${ext}`;
         cb(null, uniqueSuffix);
       },
     }),
     fileFilter: (req, file, cb) => {
-      if (!file.mimetype.match(/\/(jpg|jpeg|png|gif|webp)$/)) {
-        cb(new Error('只支持图片文件'), false);
+      const allowedMimes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+      if (!allowedMimes.includes(file.mimetype)) {
+        cb(new Error('只支持 JPG/PNG/GIF/WebP 图片文件'), false);
       } else {
         cb(null, true);
       }
@@ -45,6 +53,9 @@ export class UsersController {
     limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
   }))
   async uploadAvatar(@Request() req: any, @UploadedFile() file: any) {
+    if (!file) {
+      throw new BadRequestException('未上传文件');
+    }
     const avatarUrl = `/uploads/avatars/${file.filename}`;
     await this.usersService.updateProfile(req.user.id, { avatar: avatarUrl });
     return { url: avatarUrl };

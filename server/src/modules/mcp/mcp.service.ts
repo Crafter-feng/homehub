@@ -244,7 +244,7 @@ export class McpService {
     const getItemMatch = resolvedPath.match(/^\/v1\/stock\/invItems\/(\d+)$/);
     if (getItemMatch && method === 'GET') {
       const itemId = parseInt(getItemMatch[1], 10);
-      return this.stockService.getById(itemId);
+      return this.stockService.getById(itemId, familyId);
     }
 
     // PUT /v1/stock/invItems/{id} → update_item
@@ -401,7 +401,7 @@ export class McpService {
     const checkMatch = resolvedPath.match(/^\/v1\/hhLists\/invItems\/(\d+)\/check$/);
     if (checkMatch && method === 'POST') {
       const itemId = parseInt(checkMatch[1], 10);
-      return this.listsService.checkItem(itemId, userId);
+      return this.listsService.checkItem(itemId, userId, familyId);
     }
 
     // POST /v1/hhLists/invItems/{id}/uncheck → uncheck_list_item
@@ -471,7 +471,7 @@ export class McpService {
     const getRecipeMatch = resolvedPath.match(/^\/v1\/hhRecipes\/(\d+)$/);
     if (getRecipeMatch && method === 'GET') {
       const recipeId = parseInt(getRecipeMatch[1], 10);
-      return this.recipesService.getById(recipeId);
+      return this.recipesService.getById(recipeId, familyId);
     }
 
     // PUT /v1/hhRecipes/{id} → update_recipe

@@ -2,7 +2,7 @@ import { Injectable, Inject, NotFoundException, ForbiddenException } from '@nest
 import { DATABASE_TOKEN } from '../../db/database.module';
 import { eq, and, sql, desc, inArray } from 'drizzle-orm';
 import { hhLists, hhListItems, hhListItemComments, hhHolidayTemplates } from '../../db/schema';
-import { invItems } from '../../db/schema';
+import { invItems, invStockTransactions } from '../../db/schema';
 import { CreateListDto, UpdateListDto, AddListItemDto, UpdateListItemDto, AssignListItemDto, AddCommentDto } from './dto/list.dto';
 
 @Injectable()
@@ -139,57 +139,69 @@ export class ListsService {
     return { success: true };
   }
 
-  async checkItem(itemId: number, userId: number) {
+  async checkItem(itemId: number, userId: number, familyId: number) {
     const item = await this.db.select().from(hhListItems)
       .where(eq(hhListItems.id, itemId))
       .get();
     if (!item) throw new NotFoundException('条目不存在');
 
     const list = await this.db.select().from(hhLists)
-      .where(eq(hhLists.id, item.listId))
+      .where(and(eq(hhLists.id, item.listId), eq(hhLists.familyId, familyId)))
       .get();
+    if (!list) throw new NotFoundException('清单不存在');
 
-    // 更新条目状态
-    await this.db.update(hhListItems).set({
-      status: 'completed',
-      completedBy: userId,
-      completedAt: new Date(),
-    }).where(eq(hhListItems.id, itemId)).run();
+    return this.db.transaction((tx: any) => {
+      tx.update(hhListItems).set({
+        status: 'completed',
+        completedBy: userId,
+        completedAt: new Date(),
+      }).where(eq(hhListItems.id, itemId)).run();
 
-    // 购物清单：打勾自动入库
-    if (list?.type === 'shopping' && item.linkedItemId) {
-      const stockItem = await this.db.select().from(invItems)
-        .where(eq(invItems.id, item.linkedItemId))
-        .get();
-      if (stockItem) {
-        await this.db.update(invItems).set({
-          quantity: stockItem.quantity + (item.quantity || 1),
-          updatedAt: new Date(),
-        }).where(eq(invItems.id, item.linkedItemId)).run();
+      // 购物清单：打勾自动入库
+      if (list?.type === 'shopping' && item.linkedItemId) {
+        const stockItem = tx.select().from(invItems)
+          .where(eq(invItems.id, item.linkedItemId))
+          .get();
+        if (stockItem) {
+          tx.update(invItems).set({
+            quantity: stockItem.quantity + (item.quantity || 1),
+            updatedAt: new Date(),
+          }).where(eq(invItems.id, item.linkedItemId)).run();
+
+          tx.insert(invStockTransactions).values({
+            itemId: item.linkedItemId,
+            type: 'add',
+            quantity: item.quantity || 1,
+            unit: stockItem.unit || '个',
+            userId,
+            source: 'manual',
+            note: '购物清单自动入库',
+          }).run();
+        }
       }
-    }
 
-    // 家务：完成自动重置
-    if (list?.type === 'chore' && list.config) {
-      const config = list.config as any;
-      if (config.autoReset) {
-        const now = new Date();
-        let resetDate = new Date(now);
-        if (config.autoReset === 'daily') resetDate.setDate(resetDate.getDate() + 1);
-        else if (config.autoReset === 'weekly') resetDate.setDate(resetDate.getDate() + 7);
-        else if (config.autoReset === 'monthly') resetDate.setMonth(resetDate.getMonth() + 1);
+      // 家务：完成自动重置
+      if (list?.type === 'chore' && list.config) {
+        const config = list.config as any;
+        if (config.autoReset) {
+          const now = new Date();
+          let resetDate = new Date(now);
+          if (config.autoReset === 'daily') resetDate.setDate(resetDate.getDate() + 1);
+          else if (config.autoReset === 'weekly') resetDate.setDate(resetDate.getDate() + 7);
+          else if (config.autoReset === 'monthly') resetDate.setMonth(resetDate.getMonth() + 1);
 
-        await this.db.update(hhListItems).set({
-          status: 'pending',
-          completedBy: null,
-          completedAt: null,
-          dueAt: resetDate,
-          lastResetAt: now,
-        }).where(eq(hhListItems.id, itemId)).run();
+          tx.update(hhListItems).set({
+            status: 'pending',
+            completedBy: null,
+            completedAt: null,
+            dueAt: resetDate,
+            lastResetAt: now,
+          }).where(eq(hhListItems.id, itemId)).run();
+        }
       }
-    }
 
-    return this.db.select().from(hhListItems).where(eq(hhListItems.id, itemId)).get();
+      return tx.select().from(hhListItems).where(eq(hhListItems.id, itemId)).get();
+    });
   }
 
   async uncheckItem(itemId: number, familyId: number) {

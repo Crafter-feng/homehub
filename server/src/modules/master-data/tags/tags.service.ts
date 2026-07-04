@@ -1,7 +1,7 @@
-import { Injectable, Inject, NotFoundException } from '@nestjs/common';
+import { Injectable, Inject, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { DATABASE_TOKEN } from '../../../db/database.module';
 import { eq, and } from 'drizzle-orm';
-import { mdTags, mdItemTags } from '../../../db/schema';
+import { mdTags, mdItemTags, invItems } from '../../../db/schema';
 
 export class CreateTagDto {
   name: string;
@@ -55,19 +55,32 @@ export class TagsService {
     return { success: true };
   }
 
-  async addToItem(itemId: number, tagId: number) {
+  async addToItem(itemId: number, tagId: number, familyId: number) {
+    // Verify item belongs to family
+    const item = await this.db.select().from(invItems)
+      .where(and(eq(invItems.id, itemId), eq(invItems.familyId, familyId)))
+      .get();
+    if (!item) throw new NotFoundException('物品不存在');
     await this.db.insert(mdItemTags).values({ itemId, tagId }).run();
     return { success: true };
   }
 
-  async removeFromItem(itemId: number, tagId: number) {
+  async removeFromItem(itemId: number, tagId: number, familyId: number) {
+    const item = await this.db.select().from(invItems)
+      .where(and(eq(invItems.id, itemId), eq(invItems.familyId, familyId)))
+      .get();
+    if (!item) throw new NotFoundException('物品不存在');
     await this.db.delete(mdItemTags)
       .where(and(eq(mdItemTags.itemId, itemId), eq(mdItemTags.tagId, tagId)))
       .run();
     return { success: true };
   }
 
-  async getItemTags(itemId: number) {
+  async getItemTags(itemId: number, familyId: number) {
+    const item = await this.db.select().from(invItems)
+      .where(and(eq(invItems.id, itemId), eq(invItems.familyId, familyId)))
+      .get();
+    if (!item) throw new NotFoundException('物品不存在');
     return this.db.select({
       id: mdTags.id,
       name: mdTags.name,

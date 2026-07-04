@@ -4,7 +4,7 @@
     @update:show="$emit('update:show', $event)"
     preset="card"
     :title="item?.name || ''"
-    style="width: 95vw; max-width: 600px"
+    style="width: 95vw; max-width: 600px; height: 520px"
     :segmented="{ content: true, footer: true }"
     :mask-closable="true"
     :close-on-esc="true"

@@ -1,4 +1,4 @@
-import { Injectable, Inject } from '@nestjs/common';
+import { Injectable, Inject, NotFoundException } from '@nestjs/common';
 import { DATABASE_TOKEN } from '../../db/database.module';
 import { eq, and, sql } from 'drizzle-orm';
 import { invItems, sysNfcTagState } from '../../db/schema';
@@ -30,9 +30,10 @@ export class ScannerService {
    * 外部条码库查询（极数本源 API + Open Food Facts 备用）
    */
   async lookupExternal(barcode: string) {
+    const encodedBarcode = encodeURIComponent(barcode);
     // 1. 尝试极数本源 API (apizero.cn)
     try {
-      const response = await fetch(`https://api.apizero.cn/barcode/${barcode}`, {
+      const response = await fetch(`https://api.apizero.cn/barcode/${encodedBarcode}`, {
         headers: { 'Accept': 'application/json' },
         signal: AbortSignal.timeout(5000),
       });
@@ -56,7 +57,7 @@ export class ScannerService {
 
     // 2. 备用查询（Open Food Facts）
     try {
-      const response = await fetch(`https://world.openfoodfacts.org/api/v2/product/${barcode}.json`, {
+      const response = await fetch(`https://world.openfoodfacts.org/api/v2/product/${encodedBarcode}.json`, {
         signal: AbortSignal.timeout(5000),
       });
 
@@ -105,9 +106,9 @@ export class ScannerService {
   /**
    * 获取 NFC 标签状态
    */
-  async getNfcTagState(tagUid: string) {
+  async getNfcTagState(tagUid: string, familyId: number) {
     return this.db.select().from(sysNfcTagState)
-      .where(eq(sysNfcTagState.tagUid, tagUid))
+      .where(and(eq(sysNfcTagState.tagUid, tagUid), eq(sysNfcTagState.familyId, familyId)))
       .get();
   }
 
@@ -115,7 +116,7 @@ export class ScannerService {
    * 更新 NFC 标签状态
    */
   async updateNfcTagState(tagUid: string, familyId: number, ndefWritten: boolean) {
-    const existing = await this.getNfcTagState(tagUid);
+    const existing = await this.getNfcTagState(tagUid, familyId);
 
     if (existing) {
       await this.db.update(sysNfcTagState)
@@ -137,7 +138,7 @@ export class ScannerService {
       });
     }
 
-    return this.getNfcTagState(tagUid);
+    return this.getNfcTagState(tagUid, familyId);
   }
 
   // ═══════════════════════════════════════════

@@ -29,17 +29,17 @@ export class TagsController {
   }
 
   @Post('item/:itemId/:tagId')
-  addToItem(@Param('itemId') itemId: string, @Param('tagId') tagId: string) {
-    return this.tagsService.addToItem(parseInt(itemId), parseInt(tagId));
+  addToItem(@Param('itemId') itemId: string, @Param('tagId') tagId: string, @Request() req: any) {
+    return this.tagsService.addToItem(parseInt(itemId), parseInt(tagId), req.user.familyId);
   }
 
   @Delete('item/:itemId/:tagId')
-  removeFromItem(@Param('itemId') itemId: string, @Param('tagId') tagId: string) {
-    return this.tagsService.removeFromItem(parseInt(itemId), parseInt(tagId));
+  removeFromItem(@Param('itemId') itemId: string, @Param('tagId') tagId: string, @Request() req: any) {
+    return this.tagsService.removeFromItem(parseInt(itemId), parseInt(tagId), req.user.familyId);
   }
 
   @Get('item/:itemId')
-  getItemTags(@Param('itemId') itemId: string) {
-    return this.tagsService.getItemTags(parseInt(itemId));
+  getItemTags(@Param('itemId') itemId: string, @Request() req: any) {
+    return this.tagsService.getItemTags(parseInt(itemId), req.user.familyId);
   }
 }

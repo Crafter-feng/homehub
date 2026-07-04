@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Put, Delete, Body, Param, Request, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
-import { LocationsService, CreateLocationDto, UpdateLocationDto } from './locations.service';
+import { LocationsService } from './locations.service';
+import { CreateLocationDto, UpdateLocationDto } from './dto/location.dto';
 
 @Controller('locations')
 @UseGuards(JwtAuthGuard)

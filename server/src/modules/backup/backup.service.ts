@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -29,6 +29,25 @@ export class BackupService {
     if (!fs.existsSync(this.backupDir)) {
       fs.mkdirSync(this.backupDir, { recursive: true });
     }
+  }
+
+  private sanitizeFilename(filename: string): string {
+    // Only allow alphanumeric, dots, hyphens, underscores
+    const basename = path.basename(filename);
+    if (basename !== filename || !/^[\w.-]+$/.test(filename)) {
+      throw new BadRequestException('无效的文件名');
+    }
+    return filename;
+  }
+
+  private getBackupPath(filename: string): string {
+    const safe = this.sanitizeFilename(filename);
+    const backupPath = path.join(this.backupDir, safe);
+    // Ensure the resolved path is within the backup directory (extra safety)
+    if (!backupPath.startsWith(this.backupDir)) {
+      throw new BadRequestException('无效的文件名');
+    }
+    return backupPath;
   }
 
   private getManifest(): BackupManifest[] {
@@ -82,14 +101,17 @@ export class BackupService {
   }
 
   async getBackupInfo(filename: string): Promise<BackupManifest> {
+    const safe = this.sanitizeFilename(filename);
     const manifest = this.getManifest();
-    const backup = manifest.find(b => b.filename === filename);
+    const backup = manifest.find(b => b.filename === safe);
     if (!backup) throw new NotFoundException('备份不存在');
     return backup;
   }
 
   async restoreBackup(filename: string, createPreRestore = true): Promise<{ restored: boolean; preRestoreBackup?: BackupManifest }> {
-    const backupPath = path.join(this.backupDir, filename);
+    // Verify backup exists in manifest first
+    await this.getBackupInfo(filename);
+    const backupPath = this.getBackupPath(filename);
     if (!fs.existsSync(backupPath)) {
       throw new NotFoundException('备份文件不存在');
     }
@@ -103,19 +125,24 @@ export class BackupService {
       throw new Error('数据库文件路径不存在');
     }
 
-    fs.copyFileSync(backupPath, this.dbPath);
+    // Copy to a temp file first, then swap atomically
+    const tempPath = this.dbPath + '.restore_tmp';
+    fs.copyFileSync(backupPath, tempPath);
+    fs.renameSync(tempPath, this.dbPath);
     this.logger.log(`数据库已恢复: ${filename}`);
 
     return { restored: true, preRestoreBackup };
   }
 
   async deleteBackup(filename: string): Promise<{ deleted: boolean }> {
-    const backupPath = path.join(this.backupDir, filename);
+    await this.getBackupInfo(filename);
+    const backupPath = this.getBackupPath(filename);
     if (fs.existsSync(backupPath)) {
       fs.unlinkSync(backupPath);
     }
 
-    const manifest = this.getManifest().filter(b => b.filename !== filename);
+    const safe = this.sanitizeFilename(filename);
+    const manifest = this.getManifest().filter(b => b.filename !== safe);
     this.saveManifest(manifest);
     this.logger.log(`备份已删除: ${filename}`);
     return { deleted: true };
