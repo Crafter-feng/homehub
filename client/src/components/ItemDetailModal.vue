@@ -22,65 +22,65 @@
           <n-tag v-if="isLowStock" size="small" round :bordered="false" type="warning">低库存</n-tag>
         </div>
 
-        <!-- Tabs -->
-        <n-tabs type="line" animated default-value="info" style="margin-top: 12px">
-          <n-tab-pane name="info" tab="物品信息">
+        <!-- Tabs — 固定高度，内部滚动 -->
+        <n-tabs type="line" animated default-value="info" class="detail-tabs">
+          <n-tab-pane name="info" tab="物品信息" class="tab-scroll">
             <div class="stat-row">
-          <div class="detail-stat">
-            <span class="detail-stat-label">数量</span>
-            <span class="detail-stat-value">{{ item.quantity }} {{ item.unit }}</span>
-            <span class="detail-stat-sub" v-if="item.minStock">最低 {{ item.minStock }}</span>
-          </div>
-          <div class="detail-stat">
-            <span class="detail-stat-label">位置</span>
-            <span class="detail-stat-value">{{ getLocationName(item.locationId) }}</span>
-          </div>
-          <div class="detail-stat">
-            <span class="detail-stat-label">保质期</span>
-            <span class="detail-stat-value" :class="{ 'text-danger': isExpired }">
-              {{ item.expiryDate ? formatDate(item.expiryDate) : '无' }}
-            </span>
-          </div>
-        </div>
+              <div class="detail-stat">
+                <span class="detail-stat-label">数量</span>
+                <span class="detail-stat-value">{{ item.quantity }} {{ item.unit }}</span>
+                <span class="detail-stat-sub" v-if="item.minStock">最低 {{ item.minStock }}</span>
+              </div>
+              <div class="detail-stat">
+                <span class="detail-stat-label">位置</span>
+                <span class="detail-stat-value">{{ getLocationName(item.locationId) }}</span>
+              </div>
+              <div class="detail-stat">
+                <span class="detail-stat-label">保质期</span>
+                <span class="detail-stat-value" :class="{ 'text-danger': isExpired }">
+                  {{ item.expiryDate ? formatDate(item.expiryDate) : '无' }}
+                </span>
+              </div>
+            </div>
 
-        <div class="detail-grid">
-          <div class="detail-section">
-            <h3 class="detail-section-title">购买信息</h3>
-            <div class="detail-field">
-              <span class="detail-field-label">购买价格</span>
-              <span class="detail-field-value">{{ item.purchasePrice ? `¥${item.purchasePrice}` : '-' }}</span>
+            <div class="detail-grid">
+              <div class="detail-section">
+                <h3 class="detail-section-title">购买信息</h3>
+                <div class="detail-field">
+                  <span class="detail-field-label">购买价格</span>
+                  <span class="detail-field-value">{{ item.purchasePrice ? `¥${item.purchasePrice}` : '-' }}</span>
+                </div>
+                <div class="detail-field">
+                  <span class="detail-field-label">购买日期</span>
+                  <span class="detail-field-value">{{ item.purchaseDate ? formatDate(item.purchaseDate) : '-' }}</span>
+                </div>
+                <div class="detail-field">
+                  <span class="detail-field-label">品牌</span>
+                  <span class="detail-field-value">{{ item.brand || '-' }}</span>
+                </div>
+                <div class="detail-field" v-if="item.shop">
+                  <span class="detail-field-label">商店</span>
+                  <span class="detail-field-value">{{ item.shop }}</span>
+                </div>
+              </div>
+              <div class="detail-section">
+                <h3 class="detail-section-title">备注</h3>
+                <div class="detail-notes">{{ item.notes || '暂无备注' }}</div>
+                <div class="detail-field">
+                  <span class="detail-field-label">条码</span>
+                  <span class="detail-field-value">{{ item.barcode || '-' }}</span>
+                </div>
+              </div>
             </div>
-            <div class="detail-field">
-              <span class="detail-field-label">购买日期</span>
-              <span class="detail-field-value">{{ item.purchaseDate ? formatDate(item.purchaseDate) : '-' }}</span>
-            </div>
-            <div class="detail-field">
-              <span class="detail-field-label">品牌</span>
-              <span class="detail-field-value">{{ item.brand || '-' }}</span>
-            </div>
-            <div class="detail-field" v-if="item.shop">
-              <span class="detail-field-label">商店</span>
-              <span class="detail-field-value">{{ item.shop }}</span>
-            </div>
-          </div>
-          <div class="detail-section">
-            <h3 class="detail-section-title">备注</h3>
-            <div class="detail-notes">{{ item.notes || '暂无备注' }}</div>
-            <div class="detail-field">
-              <span class="detail-field-label">条码</span>
-              <span class="detail-field-value">{{ item.barcode || '-' }}</span>
-            </div>
-          </div>
-        </div>
           </n-tab-pane>
 
           <!-- 价格追踪 Tab -->
-          <n-tab-pane name="price" tab="价格追踪">
+          <n-tab-pane name="price" tab="价格追踪" class="tab-scroll">
             <PriceHistoryChart v-if="item" :item-id="item.id" />
           </n-tab-pane>
 
           <!-- 批次 Tab -->
-          <n-tab-pane name="batches" tab="批次信息">
+          <n-tab-pane name="batches" tab="批次信息" class="tab-scroll">
             <div class="batch-section">
               <div class="batch-header">
                 <span class="batch-count">共 {{ batches.length }} 个批次</span>
@@ -110,7 +110,7 @@
             </div>
           </n-tab-pane>
 
-          <n-tab-pane name="history" tab="操作记录">
+          <n-tab-pane name="history" tab="操作记录" class="tab-scroll">
             <div class="history-section" v-if="history.length > 0">
               <div class="timeline">
                 <div class="timeline-item" v-for="(record, index) in history" :key="record.id">
@@ -324,15 +324,38 @@ watch(() => props.show, (val) => {
 
 <style scoped>
 .item-detail-content {
-  max-height: 55vh;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  height: 420px;
 }
 
 .detail-tags {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
+  flex-shrink: 0;
+}
+
+.detail-tabs {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.detail-tabs :deep(.n-tabs-content) {
+  flex: 1;
+  min-height: 0;
+}
+
+.detail-tabs :deep(.n-tab-pane) {
+  height: 100%;
+}
+
+.tab-scroll {
+  overflow-y: auto;
+  max-height: 340px;
 }
 
 .stat-row {
