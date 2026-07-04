@@ -1,0 +1,218 @@
+classDiagram
+
+    %% === NestJS Module Layer ===
+    class PluginModule {
+        <<NestJS Module>>
+        +providers: PluginRegistryService, ContextFactoryService, PluginStorageService, EventBusService
+        +exports: PluginRegistryService, EventBusService, PluginStorageService
+    }
+
+    %% === Core Services ===
+    class PluginRegistryService {
+        -Map~string,PluginInstance~ plugins
+        -Map~ExtensionPointType,Map~string,HomeHubPlugin~~ extensionPoints
+        -ContextFactoryService contextFactory
+        +discoverFromDir(dir: string) Promise~HomeHubPluginMeta[]~
+        +load(plugin: HomeHubPlugin) Promise~void~
+        +unload(pluginId: string) Promise~void~
+        +getPlugins~T~(point: ExtensionPointType) T[]
+        +getPluginByType~T~(point: ExtensionPointType, typeKey: string) T | null
+        +getFirstPlugin~T~(point: ExtensionPointType) T | null
+        +getPluginService(pluginId: string, serviceName: string) any
+        +listPlugins() PluginInfo[]
+    }
+
+    class ContextFactoryService {
+        <<NestJS Injectable>>
+        -Database db
+        -ConfigService configService
+        -EventBusService eventBus
+        -PluginStorageService storage
+        +createContext(pluginId: string) PluginContext
+    }
+
+    class PluginStorageService {
+        <<NestJS Injectable>>
+        -Database db
+        +forPlugin(pluginId: string) ScopedPluginStorage
+        +get(pluginId: string, key: string) Promise~any~
+        +set(pluginId: string, key: string, value: any) Promise~void~
+        +delete(pluginId: string, key: string) Promise~void~
+        +clear(pluginId: string) Promise~void~
+    }
+
+    class EventBusService {
+        <<NestJS Injectable>>
+        -Map~string,Set~EventHandler~~ handlers
+        +emit(event: string, data: any) void
+        +on(event: string, handler: EventHandler) ()=>void
+        +off(event: string, handler: EventHandler) void
+        +once(event: string, handler: EventHandler) ()=>void
+    }
+
+    %% === Plugin Context ===
+    class PluginContext {
+        +PluginRegistryService registry
+        +Database db
+        +ConfigService config
+        +Logger logger
+        +EventBusService eventBus
+        +ScopedPluginStorage storage
+    }
+
+    %% === Plugin Interfaces ===
+    class HomeHubPlugin {
+        <<interface>>
+        +HomeHubPluginMeta meta
+        +onLoad?(ctx: PluginContext) Promise~void~
+        +onUnload?(ctx: PluginContext) Promise~void~
+        +exports?: Record~string,any~
+    }
+
+    class HomeHubPluginMeta {
+        +string id
+        +string name
+        +string version
+        +string[] extensionPoints
+        +PluginRuntime? runtime
+        +Record? configSchema
+        +string[]? permissions
+    }
+
+    %% === Extension Point Contracts ===
+    class ScannerPluginExports {
+        <<interface>>
+        +string type
+        +string name
+        +number priority
+        +boolean supported
+        +scan(options?: any) Promise~ScanResult~
+        +listen(callback: ScanCallback) ()=>void
+    }
+
+    class ItemTypePluginExports {
+        <<interface>>
+        +string type
+        +string name
+        +string icon
+        +ItemTypeConfig config
+        +validate?(data: any) ValidationResult
+    }
+
+    class ItemTypeConfig {
+        +FieldDef[] fields
+        +boolean hasStateMachine
+        +StateMachineDef? stateMachine
+        +string[] features
+        +string? defaultUnit
+        +string? renderComponent
+    }
+
+    class McpToolExports {
+        <<interface>>
+        +string name
+        +string description
+        +string method
+        +string apiPath
+        +Record? parameters
+        +string? mapParams
+    }
+
+    class TriggerActionPluginExports {
+        <<interface>>
+        +string type
+        +string name
+        +execute(config: Record, context: ActionContext) Promise~ActionResult~
+    }
+
+    class OutputDevicePluginExports {
+        <<interface>>
+        +string type
+        +string name
+        +detect() Promise~DeviceInfo[]~
+        +print(job: PrintJob) Promise~PrintResult~
+    }
+
+    %% === Trigger Resolver + Pipeline ===
+    class TriggerResolverService {
+        <<NestJS Injectable>>
+        -PluginRegistryService registry
+        -TriggerService triggerService
+        +resolve(scan: ScanResult, context: ResolveContext) Promise~ResolvedAction~
+    }
+
+    class ActionPipelineService {
+        <<NestJS Injectable>>
+        -PluginRegistryService registry
+        +execute(action: ResolvedAction) Promise~void~
+    }
+
+    %% === MCP Dynamic ===
+    class McpController {
+        -McpService mcpService
+        -PluginRegistryService registry
+        +handleRequest(auth, body) JSONRPCResponse
+        +getToolsList() McpToolInfo[]
+    }
+
+    class McpService {
+        -Database db
+        +callApi(method, path, params, familyId, userId) Promise~any~
+        +validateToken(token: string) Promise~ApiTokenUser~
+    }
+
+    %% === Stock Integration ===
+    class StockService {
+        -Database db
+        -PluginRegistryService registry
+        +getItemTypeConfig(itemType: string) ItemTypePluginExports | null
+        +validateStateMachineTransition(itemId, action) Promise~boolean~
+    }
+
+    %% === Frontend Plugin System ===
+    class ClientRegistry {
+        -Map~string,ClientPluginExports~ clientPlugins
+        -Map~string,HomeHubPluginMeta~ serverPlugins
+        +registerClientPlugin(pluginId, exports) void
+        +getSlotComponents(slotName) Component[]
+        +getScannerAdapter(scannerType) ScannerPluginExports
+    }
+
+    class SlotManager {
+        -ClientRegistry registry
+        +getComponentForSlot(slotName, props) Component | null
+        +getItemTypeComponent(itemType, slotName) Component | null
+    }
+
+    class PluginSlotVue {
+        <<Vue Component>>
+        +string name
+        +Record props
+        +render() VNode
+    }
+
+    %% === Relationships ===
+    PluginModule -- PluginRegistryService : provides
+    PluginModule -- ContextFactoryService : provides
+    PluginModule -- PluginStorageService : provides
+    PluginModule -- EventBusService : provides
+
+    ContextFactoryService -- PluginContext : creates
+    ContextFactoryService ..> Database : injects
+    ContextFactoryService ..> ConfigService : injects
+
+    PluginRegistryService -- ContextFactoryService : uses to createContext
+    PluginRegistryService ..> HomeHubPlugin : manages lifecycle
+
+    HomeHubPlugin -- HomeHubPluginMeta : has
+    HomeHubPlugin ..> PluginContext : receives on onLoad
+
+    TriggerResolverService -- PluginRegistryService : queries for TriggerAction
+    ActionPipelineService -- PluginRegistryService : finds executor
+
+    McpController -- PluginRegistryService : dynamic tool collection
+    StockService -- PluginRegistryService : queries ItemType
+
+    ClientRegistry ..> HomeHubPluginMeta : synced from server
+    SlotManager -- ClientRegistry : queries
+    PluginSlotVue -- SlotManager : renders dynamic component

@@ -1,0 +1,143 @@
+%% HomeHub 4 模块类图
+classDiagram
+    direction LR
+
+    class IotTagsService {
+        -db: any
+        +listReaders(familyId) any[]
+        +getReaderById(id) any
+        +createReader(familyId, dto) any
+        +updateReader(id, familyId, dto) any
+        +deleteReader(id, familyId) ~success~
+        +heartbeat(id, familyId) any
+        +listZones(familyId, readerId?) any[]
+        +getZoneById(id) any
+        +createZone(familyId, dto) any
+        +updateZone(id, familyId, dto) any
+        +deleteZone(id, familyId) ~success~
+    }
+
+    class DocumentsService {
+        -db: any
+        +upload(familyId, file, meta) DocumentSelect
+        +list(familyId, itemId?) DocumentSelect[]
+        +getById(id, familyId) DocumentSelect
+        +download(id, familyId, res) void
+        +delete(id, familyId) ~success~
+    }
+
+    class HistoryService {
+        -db: any
+        +getItemHistory(itemId) any[]
+        +getFamilyTimeline(familyId, filters, pagination) PaginationResponse
+        +getScanLogs(familyId, limit?) ScanLogSelect[]
+    }
+
+    class AdminService {
+        -db: any
+        -pluginRegistry: PluginRegistryService
+        +getSystemStats() SystemStats
+        +listUsers() UserSelect[]
+        +listFamilies() FamilyWithCount[]
+        +listApiTokens(familyId?) ApiTokenSelect[]
+        +getPluginOverview() any[]
+    }
+
+    class RfidReadersTable {
+        <<schema rfid_readers>>
+        +id: integer
+        +familyId: integer
+        +name: text
+        +locationId: integer?
+        +readerType: 'hf'|'uhf'
+        +deviceId: text
+        +config: json?
+        +lastOnlineAt: timestamp?
+        +createdAt: timestamp
+    }
+
+    class RfidZonesTable {
+        <<schema rfid_zones>>
+        +id: integer
+        +readerId: integer
+        +tagPattern: text?
+        +locationId: integer?
+        +notes: text?
+    }
+
+    class DocumentsTable {
+        <<schema documents (NEW)>>
+        +id: integer
+        +familyId: integer
+        +itemId: integer?
+        +name: text
+        +filePath: text
+        +mimeType: text
+        +fileSize: integer
+        +category: enum
+        +createdAt: timestamp
+    }
+
+    class StockTransactionsTable {
+        <<schema stock_transactions>>
+        +id: integer
+        +itemId: integer
+        +type: enum
+        +quantity: real
+        +source: enum
+        +createdAt: timestamp
+    }
+
+    class ScanLogsTable {
+        <<schema scan_logs>>
+        +id: integer
+        +familyId: integer
+        +scanType: enum
+        +code: text
+        +createdAt: timestamp
+    }
+
+    class PluginRegistryService {
+        <<global @Global>>
+        +listPlugins() any[]
+        +getPlugin(id) HomeHubPlugin
+        +isLoaded(id) boolean
+    }
+
+    class CreateReaderDto {
+        +name: string
+        +readerType: 'hf'|'uhf'
+        +deviceId: string
+        +locationId?: number
+        +config?: json
+    }
+    class UpdateReaderDto {
+        +name?: string
+        +locationId?: number
+        +config?: json
+    }
+    class CreateZoneDto {
+        +readerId: number
+        +tagPattern?: string
+        +locationId?: number
+        +notes?: string
+    }
+    class UploadMetaDto {
+        +itemId?: number
+        +category?: enum
+    }
+    class TimelineQueryDto {
+        +type?: enum
+        +source?: enum
+        +startDate?: number
+        +endDate?: number
+    }
+
+    IotTagsService --> RfidReadersTable : 读写
+    IotTagsService --> RfidZonesTable : 读写
+    DocumentsService --> DocumentsTable : 读写
+    HistoryService --> StockTransactionsTable : 查询
+    HistoryService --> ScanLogsTable : 查询
+    AdminService --> PluginRegistryService : 委托 listPlugins()
+    RfidZonesTable --> RfidReadersTable : readerId FK
+    DocumentsTable --> StockTransactionsTable : itemId 可空 FK

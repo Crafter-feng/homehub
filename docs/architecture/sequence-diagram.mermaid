@@ -1,0 +1,44 @@
+sequenceDiagram
+    participant User as 用户浏览器
+    participant Router as Vue Router Guard
+    participant Api as Axios Client
+    participant Server as NestJS Server
+    participant JwtRefresh as JwtRefreshStrategy
+    participant AuthService as AuthService
+
+    Note over User,Api: 正常请求场景 — accessToken 有效
+    User->>Api: 发起 API 请求（带 accessToken）
+    Api->>Server: GET /api/v1/stock/items (Authorization: Bearer accessToken)
+    Server-->>Api: 200 OK + data
+    Api-->>User: 显示数据
+
+    Note over User,AuthService: accessToken 过期场景 — 需要静默刷新
+    User->>Api: 发起 API 请求（带过期 accessToken）
+    Api->>Server: GET /api/v1/stock/items (过期 accessToken)
+    Server-->>Api: 401 Unauthorized
+
+    Note over Api: 响应拦截器检测到 401
+    Api->>Api: isRefreshing = true, 检查 refreshToken 是否存在
+    
+    Api->>Server: POST /api/v1/auth/refresh (body: { refreshToken })
+    Note over Server: RefreshTokenGuard 激活 JwtRefreshStrategy
+    Server->>JwtRefresh: 从 body 提取 refreshToken, 用 JWT_REFRESH_SECRET 验证
+    JwtRefresh-->>Server: { sub, email, familyId, refreshToken }
+    Server->>AuthService: validateRefreshToken + refreshTokens()
+    AuthService-->>Server: { accessToken: 新, refreshToken: 新 }
+    Server-->>Api: 200 { accessToken, refreshToken }
+
+    Api->>Api: 存储新 tokens (TokenStorage.setAccessToken/setRefreshToken)
+    Api->>Api: onRefreshed(newAccessToken) — 通知排队请求
+    Api->>Api: 用新 accessToken 重试原请求
+
+    Api->>Server: GET /api/v1/stock/items (新 accessToken)
+    Server-->>Api: 200 OK + data
+    Api-->>User: 显示数据
+    Api->>Api: isRefreshing = false
+
+    Note over User,AuthService: refreshToken 也过期场景 — 跳转登录
+    Api->>Server: POST /api/v1/auth/refresh (过期 refreshToken)
+    Server-->>Api: 401 Unauthorized
+    Api->>Api: clearAuthAndRedirect()
+    Api-->>User: 重定向到 /login

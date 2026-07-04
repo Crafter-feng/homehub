@@ -1,0 +1,89 @@
+%% HomeHub 4 模块关键调用序列
+sequenceDiagram
+    participant FE as Frontend
+    participant Ctrl as Controller
+    participant Svc as Service
+    participant DB as DB (Drizzle)
+    participant FS as Filesystem
+
+    %% iot_tags: Reader 创建
+    Note over FE,DB: iot_tags — 创建 RFID Reader
+    FE->>Ctrl: POST /rfid-readers (CreateReaderDto)
+    Ctrl->>Svc: createReader(familyId, dto)
+    Svc->>DB: insert(rfidReaders).values(...).returning().get()
+    DB-->>Svc: reader row
+    Svc-->>Ctrl: reader
+    Ctrl-->>FE: 201 reader
+
+    %% iot_tags: heartbeat
+    Note over FE,DB: iot_tags — Reader 心跳上报
+    FE->>Ctrl: POST /rfid-readers/:id/heartbeat
+    Ctrl->>Svc: heartbeat(id, familyId)
+    Svc->>DB: update(rfidReaders).set({lastOnlineAt: new Date()}).where(...).run()
+    DB-->>Svc: ok
+    Svc-->>FE: { success: true }
+
+    %% documents: 上传
+    Note over FE,FS: documents — 上传文档
+    FE->>Ctrl: POST /documents/upload (multipart file + itemId? + category?)
+    Note right of Ctrl: FileInterceptor('file')<br/>diskStorage → uploads/documents/
+    Ctrl->>Svc: upload(familyId, file, meta)
+    Svc->>FS: mkdirSync('uploads/documents', recursive)
+    Svc->>DB: insert(documents).values({filePath, mimeType, fileSize, ...}).returning().get()
+    DB-->>Svc: document row
+    Svc-->>Ctrl: DocumentSelect
+    Ctrl-->>FE: 201 document
+
+    %% documents: 下载
+    Note over FE,FS: documents — 下载文档
+    FE->>Ctrl: GET /documents/:id/download
+    Ctrl->>Svc: download(id, familyId, res)
+    Svc->>DB: select(documents).where(eq(id)).get()
+    DB-->>Svc: document row
+    Svc->>FS: res.download(join('uploads', filePath))
+    FS-->>FE: 文件流
+
+    %% documents: 删除
+    Note over FE,FS: documents — 删除文档
+    FE->>Ctrl: DELETE /documents/:id
+    Ctrl->>Svc: delete(id, familyId)
+    Svc->>DB: select(documents).where(eq(id)).get()
+    DB-->>Svc: document (拿 filePath)
+    Svc->>FS: unlinkSync(filePath) — 吞错若不存在
+    Svc->>DB: delete(documents).where(eq(id)).run()
+    DB-->>Svc: ok
+    Svc-->>FE: { success: true }
+
+    %% history: 家庭时间线
+    Note over FE,DB: history — 家庭操作时间线
+    FE->>Ctrl: GET /history/timeline?type=&source=&startDate=&endDate=&page=&limit=
+    Ctrl->>Svc: getFamilyTimeline(familyId, filters, pagination)
+    Svc->>DB: select(...).from(stockTransactions).innerJoin(items).where(and(...)).limit().offset()
+    DB-->>Svc: tx rows
+    Svc->>DB: select(count).from(stockTransactions).innerJoin(items).where(...)
+    DB-->>Svc: total
+    Svc-->>Ctrl: PaginationResponse
+    Ctrl-->>FE: { data, total, page, totalPages }
+
+    %% history: 物品历史
+    Note over FE,DB: history — 单物品历史
+    FE->>Ctrl: GET /items/:id/history
+    Ctrl->>Svc: getItemHistory(itemId)
+    Svc->>DB: select().from(stockTransactions).where(eq(itemId)).orderBy(desc(createdAt)).all()
+    DB-->>Svc: tx rows
+    Svc-->>FE: transactions[]
+
+    %% admin: 系统统计
+    Note over FE,DB: admin — 系统统计
+    FE->>Ctrl: GET /admin/stats
+    Ctrl->>Svc: getSystemStats()
+    Svc->>DB: select(count).from(users) / families / items / scanLogs
+    DB-->>Svc: counts
+    Svc-->>FE: { totalUsers, totalFamilies, totalItems, totalScans }
+
+    %% admin: 插件概览
+    Note over FE,DB: admin — 插件概览
+    FE->>Ctrl: GET /admin/plugins
+    Ctrl->>Svc: getPluginOverview()
+    Svc->>DB: (无 DB) 委托 pluginRegistry.listPlugins()
+    Svc-->>FE: plugins[]

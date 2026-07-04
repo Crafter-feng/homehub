@@ -1,0 +1,15 @@
+graph TD
+    PT01[P-T01: 插件系统基础设施<br>PluginModule + ContextFactory + PluginStorage + EventBus增强] --> PT02[P-T02: 扩展点重构 + 内置插件拆分<br>ItemType/TriggerAction/McpTool逐个注册 + Scanner前后端分离 + Resolver+Pipeline]
+    PT01 --> PT03[P-T03: 核心 Service 集成插件系统<br>StockService+TriggerService+McpController 查询Registry]
+    PT02 --> PT04[P-T04: 前端插件系统 + Scanner适配器<br>ClientRegistry + SlotManager + PluginSlot.vue + NFC/Barcode前端适配器]
+    PT01 --> PT04
+    PT01 --> PT05[P-T05: 集成验证 + 插件API端点<br>PluginsController + E2E验证]
+    PT02 --> PT05
+    PT03 --> PT05
+    PT04 --> PT05
+
+    style PT01 fill:#f9d71c,stroke:#333,color:#333
+    style PT02 fill:#87ceeb,stroke:#333,color:#333
+    style PT03 fill:#87ceeb,stroke:#333,color:#333
+    style PT04 fill:#87ceeb,stroke:#333,color:#333
+    style PT05 fill:#90ee90,stroke:#333,color:#333

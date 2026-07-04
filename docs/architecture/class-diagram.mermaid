@@ -1,0 +1,160 @@
+classDiagram
+
+    %% === Database Layer ===
+    class DbType {
+        <<type alias>>
+        BetterSQLite3Database~typeof schema~ | NodePgDatabase~typeof schema~
+    }
+    class InferSelectModel {
+        <<type helper>>
+        +inferSelect(items) ItemSelect
+        +inferSelect(stockTransactions) StockTransactionSelect
+        +inferSelect(locations) LocationSelect
+        +inferSelect(triggerBindings) TriggerBindingSelect
+    }
+    class InferInsertModel {
+        <<type helper>>
+        +inferInsert(items) ItemInsert
+        +inferInsert(stockTransactions) StockTransactionInsert
+    }
+
+    %% === Common DTOs ===
+    class PaginationQuery {
+        +number page = 1
+        +number limit = 20
+        +string sortBy
+        +string sortOrder = "desc"
+    }
+    class PaginationResponse~T~ {
+        +T[] data
+        +number total
+        +number page
+        +number limit
+        +number totalPages
+    }
+    class ApiResponse~T~ {
+        +number code
+        +T data
+        +string message
+    }
+    class PartialUpdateHelper {
+        <<utility>>
+        +pickDefined~T~(dto: Partial~T~, allowedFields: string[]) Partial~T~
+    }
+
+    %% === Auth Module ===
+    class JwtStrategy {
+        -ConfigService configService
+        +validate(payload: JwtPayload) AuthUser
+    }
+    class JwtRefreshStrategy {
+        +validate(req: Request, payload: JwtRefreshPayload) AuthRefreshUser
+    }
+    class RefreshTokenGuard {
+        <<NestJS Guard>>
+    }
+    class AuthService {
+        -JwtService jwtService
+        -DbType db
+        +register(dto: RegisterDto) AuthResponse
+        +login(dto: LoginDto) AuthResponse
+        +refreshTokens(refreshToken: string) AuthResponse
+        +validateRefreshToken(token: string) JwtRefreshPayload
+        -generateTokens(userId: number, email: string, familyId: number) TokenPair
+    }
+    class AuthController {
+        -AuthService authService
+        +register(dto: RegisterDto) AuthResponse
+        +login(dto: LoginDto) AuthResponse
+        +refresh(req: Request) AuthResponse
+    }
+
+    %% === Stock Module ===
+    class StockService {
+        -DbType db
+        +list(familyId: number, pagination: PaginationQuery) PaginationResponse~ItemSelect~
+        +create(familyId: number, dto: CreateItemDto, userId: number) ItemSelect
+        +consume(itemId: number, familyId: number, userId: number, dto: ConsumeItemDto) ItemSelect
+        +transfer(itemId: number, familyId: number, userId: number, dto: TransferItemDto) ItemSelect
+        +adjust(itemId: number, familyId: number, userId: number, dto: AdjustItemDto) ItemSelect
+        +createBatch(itemId: number, familyId: number, dto: CreateBatchDto) ItemBatchSelect
+        +search(familyId: number, query: string, pagination: PaginationQuery) PaginationResponse~ItemSelect~
+    }
+    class StockController {
+        -StockService stockService
+        +listItems(req: Request, pagination: PaginationQuery) PaginationResponse~ItemSelect~
+        +createItem(req: Request, dto: CreateItemDto) ItemSelect
+        +consumeItem(id: number, req: Request, dto: ConsumeItemDto) ItemSelect
+    }
+    class CreateItemDto {
+        +string name
+        +string type
+        +string barcode
+        +number categoryId
+        +number locationId
+        +number quantity
+        +string unit
+    }
+    class UpdateItemDto {
+        <<Partial of CreateItemDto>>
+        所有字段可选
+    }
+    class ConsumeItemDto {
+        +number quantity
+        +string note
+    }
+
+    %% === Frontend Store ===
+    class AuthStore {
+        +Ref~AuthUser | null~ user
+        +Ref~string | null~ accessToken
+        +Ref~string | null~ refreshToken
+        +login(account: string, password: string) Promise~void~
+        +silentRefresh() Promise~string~
+        +logout() void
+    }
+    class StockStore {
+        +Ref~ItemSelect[]~ items
+        +Ref~boolean~ loading
+        +Ref~string | null~ error
+        +Ref~PaginationMeta~ pagination
+        +fetchItems(params: PaginationQuery) Promise~void~
+        +addItem(item: CreateItemDto) Promise~ItemSelect~
+        +consumeItem(id: number, quantity: number) Promise~ItemSelect~
+    }
+    class TokenStorage {
+        <<utility>>
+        +getAccessToken() string | null
+        +setAccessToken(token: string) void
+        +getRefreshToken() string | null
+        +setRefreshToken(token: string) void
+        +clearAll() void
+    }
+    class ApiClient {
+        -AxiosInstance instance
+        -isRefreshing boolean
+        -pendingRequests PendingRequest[]
+        +stockApi: StockApi
+        +authApi: AuthApi
+        +locationsApi: LocationsApi
+    }
+
+    %% === Relationships ===
+    DbType -- InferSelectModel : provides schema
+    DbType -- InferInsertModel : provides schema
+    AuthController -- AuthService : uses
+    AuthService -- DbType : injects
+    AuthController -- RefreshTokenGuard : uses on /refresh
+    AuthController -- JwtStrategy : uses on other endpoints
+    AuthController -- JwtRefreshStrategy : uses via RefreshTokenGuard
+    StockController -- StockService : uses
+    StockService -- DbType : injects
+    StockService ..> PartialUpdateHelper : uses pickDefined()
+    StockService ..> PaginationQuery : accepts
+    StockService ..> PaginationResponse : returns
+    AuthStore -- TokenStorage : uses
+    AuthStore -- ApiClient : uses authApi
+    StockStore -- ApiClient : uses stockApi
+    StockStore ..> PaginationQuery : passes
+    ApiClient ..> AuthStore : triggers silentRefresh on 401
+    CreateItemDto -- UpdateItemDto : extends as Partial

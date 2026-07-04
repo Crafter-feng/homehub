@@ -1,0 +1,83 @@
+sequenceDiagram
+
+    participant App as NestJS AppModule
+    participant PM as PluginModule
+    participant PRS as PluginRegistryService
+    participant CFS as ContextFactoryService
+    participant PSS as PluginStorageService
+    participant EBS as EventBusService
+    participant DB as Database Provider
+    participant CS as ConfigService
+    participant Plugin as HomeHubPlugin
+
+    Note over App,PM: NestJS 模块初始化
+    App->>PM: 注册 PluginModule
+    PM->>PRS: @Injectable PluginRegistryService 创建
+    PM->>CFS: @Injectable ContextFactoryService 创建
+    PM->>PSS: @Injectable PluginStorageService 创建
+    PM->>EBS: @Injectable EventBusService 创建
+
+    Note over PM,PRS: 模块初始化后 — 自动发现并加载内置插件
+    PM->>PRS: onModuleInit() → discoverFromDir('built-in/')
+    PRS->>PRS: 扫描 built-in/ 子目录 → 读取 plugin.json/plugin.yaml
+
+    Note over PRS,Plugin: 加载单个插件
+    PRS->>Plugin: require(pluginDir + '/index.js') → 获取 HomeHubPlugin 实例
+    PRS->>CFS: createContext(pluginId)
+    CFS->>DB: 注入 Database (via @Inject('DATABASE_CONNECTION'))
+    CFS->>CS: 注入 ConfigService (via @Inject(ConfigService))
+    CFS->>EBS: 注入 EventBusService 实例
+    CFS->>PSS: 注入 PluginStorageService.forPlugin(pluginId) scoped 实例
+    CFS-->>PRS: 返回 PluginContext {registry, db, config, logger, eventBus, storage}
+
+    PRS->>Plugin: onLoad(ctx: PluginContext)
+
+    Note over PRS,Plugin: 扩展点逐个注册
+    PRS->>PRS: 遍历 plugin.meta.extensionPoints
+    PRS->>PRS: registerToExtensionPoint(point, plugin)
+    Note over PRS: ItemType → indexed by type key (food, battery, etc.)
+    Note over PRS: TriggerAction → indexed by type key (notification, webhook, etc.)
+    Note over PRS: mcp-tool → indexed by tool name (search_items, add_item, etc.)
+
+    PRS->>EBS: emit('plugin:loaded', {pluginId, extensionPoints})
+
+    Note over PRS,Plugin: MCP 动态工具收集
+    participant Agent as AI Agent
+    participant MC as McpController
+    participant MS as McpService
+
+    Agent->>MC: POST /mcp {method: "tools/list"}
+    MC->>PRS: getPlugins~McpToolExports~('mcp-tool')
+    PRS-->>MC: [search_items, add_item, consume_item, ... + 3rd-party tools]
+    MC->>MC: 转换为 MCP inputSchema 格式
+    MC-->>Agent: {tools: [{name: "search_items", inputSchema: {...}}, ...]}
+
+    Agent->>MC: POST /mcp {method: "tools/call", params: {name: "search_items", arguments: {query: "牛奶"}}}
+    MC->>PRS: getPluginByType~McpToolExports~('mcp-tool', 'search_items')
+    PRS-->>MC: {name: "search_items", method: "GET", apiPath: "/v1/stock/items", ...}
+    MC->>MS: callApi(method="GET", apiPath="/v1/stock/items", params={query: "牛奶"}, familyId, userId)
+    MS->>DB: 代理调用 REST API 内部逻辑
+    DB-->>MS: 搜索结果数据
+    MS-->>MC: {items: [...]}
+    MC-->>Agent: {content: [{type: "text", text: JSON.stringify(result)}]}
+
+    Note over PRS,Plugin: Trigger Resolver + Action Pipeline
+    participant Client as 前端 PWA
+    participant SR as ScannerRegistryService
+    participant TR as TriggerResolverService
+    participant TS as TriggerService
+    participant AP as ActionPipelineService
+    participant TAE as TriggerActionPluginExports
+
+    Client->>SR: POST /api/v1/scan/report {type: "nfc", raw: "04:AB:CD:EF", context: {pagePath: "/stock"}}
+    SR->>TR: resolve(scanResult, context)
+    TR->>TS: lookupBinding(code="04:AB:CD:EF", codeType="nfc")
+    TS-->>TR: binding = {targetType: "item", targetId: "42"}
+    TR->>TR: matchAction(binding, state={currentPage: "stock"})
+    TR-->>TR: resolvedAction = {primary: "showDetail", params: {itemId: "42"}}
+    TR->>AP: execute(resolvedAction)
+    AP->>PRS: getPluginByType~TriggerActionPluginExports~('trigger-action', resolvedAction.actionType)
+    PRS-->>AP: 找到对应的 TriggerAction 执行器
+    AP->>TAE: execute(config, context)
+    TAE-->>AP: {success: true}
+    AP->>EBS: emit('action:executed', {actionType, result})
