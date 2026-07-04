@@ -73,60 +73,6 @@
         </div>
           </n-tab-pane>
 
-          <!-- 批次 Tab -->
-          <n-tab-pane name="batches" tab="批次信息">
-            <div class="batch-section">
-              <div class="batch-header">
-                <span class="batch-count">共 {{ batches.length }} 个批次</span>
-                <n-button size="small" @click="handleCompactBatches" :loading="compacting">
-                  合并批次
-                </n-button>
-              </div>
-              <div v-if="batches.length === 0" class="batch-empty">暂无批次数据</div>
-              <div v-else class="batch-list">
-                <div v-for="batch in batches" :key="batch.id" class="batch-item">
-                  <div class="batch-info">
-                    <span class="batch-number">{{ batch.batchNumber || `批次#${batch.id}` }}</span>
-                    <span class="batch-qty">{{ batch.quantity }} {{ batch.unit }}</span>
-                  </div>
-                  <div class="batch-meta">
-                    <span v-if="batch.expiryDate" :class="{ 'text-danger': isBatchExpired(batch) }">
-                      到期: {{ formatDate(batch.expiryDate) }}
-                    </span>
-                    <span v-if="batch.locationId">位置: {{ getLocationName(batch.locationId) }}</span>
-                  </div>
-                  <div class="batch-actions">
-                    <n-button size="tiny" quaternary @click="editBatch(batch)">编辑</n-button>
-                    <n-button size="tiny" quaternary type="error" @click="deleteBatch(batch)">删除</n-button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </n-tab-pane>
-
-          <n-tab-pane name="history" tab="操作记录">
-            <div class="history-section" v-if="history.length > 0">
-              <div class="timeline">
-                <div class="timeline-item" v-for="(record, index) in history" :key="record.id">
-                  <div class="timeline-line" v-if="index < history.length - 1"></div>
-                  <div class="timeline-dot" :style="{ background: getHistoryColor(record.type) }"></div>
-                  <div class="timeline-content">
-                    <div class="timeline-text">
-                      <span class="history-type-label">{{ record.type }}</span>
-                      <span class="history-quantity">× {{ record.quantity }}</span>
-                    </div>
-                    <div class="timeline-meta">
-                      <span v-if="record.source">{{ record.source }}</span>
-                      <span v-if="record.note">{{ record.note }}</span>
-                      <span>{{ formatDateTime(record.createdAt) }}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <n-empty v-else description="暂无操作记录" />
-          </n-tab-pane>
-
           <!-- 价格追踪 Tab -->
           <n-tab-pane name="price" tab="价格追踪">
             <div class="price-section" v-if="priceHistory">
@@ -188,6 +134,60 @@
               <n-empty v-else description="暂无价格记录" />
             </div>
             <n-empty v-else description="加载中..." />
+          </n-tab-pane>
+
+          <!-- 批次 Tab -->
+          <n-tab-pane name="batches" tab="批次信息">
+            <div class="batch-section">
+              <div class="batch-header">
+                <span class="batch-count">共 {{ batches.length }} 个批次</span>
+                <n-button size="small" @click="handleCompactBatches" :loading="compacting">
+                  合并批次
+                </n-button>
+              </div>
+              <div v-if="batches.length === 0" class="batch-empty">暂无批次数据</div>
+              <div v-else class="batch-list">
+                <div v-for="batch in batches" :key="batch.id" class="batch-item">
+                  <div class="batch-info">
+                    <span class="batch-number">{{ batch.batchNumber || `批次#${batch.id}` }}</span>
+                    <span class="batch-qty">{{ batch.quantity }} {{ batch.unit }}</span>
+                  </div>
+                  <div class="batch-meta">
+                    <span v-if="batch.expiryDate" :class="{ 'text-danger': isBatchExpired(batch) }">
+                      到期: {{ formatDate(batch.expiryDate) }}
+                    </span>
+                    <span v-if="batch.locationId">位置: {{ getLocationName(batch.locationId) }}</span>
+                  </div>
+                  <div class="batch-actions">
+                    <n-button size="tiny" quaternary @click="editBatch(batch)">编辑</n-button>
+                    <n-button size="tiny" quaternary type="error" @click="deleteBatch(batch)">删除</n-button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </n-tab-pane>
+
+          <n-tab-pane name="history" tab="操作记录">
+            <div class="history-section" v-if="history.length > 0">
+              <div class="timeline">
+                <div class="timeline-item" v-for="(record, index) in history" :key="record.id">
+                  <div class="timeline-line" v-if="index < history.length - 1"></div>
+                  <div class="timeline-dot" :style="{ background: getHistoryColor(record.type) }"></div>
+                  <div class="timeline-content">
+                    <div class="timeline-text">
+                      <span class="history-type-label">{{ record.type }}</span>
+                      <span class="history-quantity">× {{ record.quantity }}</span>
+                    </div>
+                    <div class="timeline-meta">
+                      <span v-if="record.source">{{ record.source }}</span>
+                      <span v-if="record.note">{{ record.note }}</span>
+                      <span>{{ formatDateTime(record.createdAt) }}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <n-empty v-else description="暂无操作记录" />
           </n-tab-pane>
         </n-tabs>
       </div>

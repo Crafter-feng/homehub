@@ -41,9 +41,6 @@ async function bootstrap() {
     }),
   );
 
-  const port = process.env.PORT || 3000;
-  await app.listen(port);
-
   // ── 合并部署：NestJS 直接托管前端 SPA ──
   // 路径优先级：环境变量 > 从 server/dist/ 向上找 client/dist/ > 从 CWD 找
   let clientDistPath =
@@ -51,13 +48,18 @@ async function bootstrap() {
     join(__dirname, '..', '..', 'client', 'dist');
 
   if (!existsSync(clientDistPath)) {
-    // fallback: 从 CWD 出发（兼容某些 CI/CD 场景）
     clientDistPath = join(process.cwd(), 'client', 'dist');
   }
 
   if (existsSync(clientDistPath)) {
-    // SPA fallback using NestJS middleware approach (compatible with Express 5)
-    app.use((req: any, res: any, next: any) => {
+    // Step 1: 静态文件服务 — 在 NestJS 路由之前注册
+    // Express.static 只服务存在的文件，不存在的自动 next()
+    app.use(express.static(clientDistPath));
+
+    // Step 2: SPA fallback — 非 API 的 GET 请求返回 index.html
+    // 放在 NestJS 路由之前：对于非 API 路径直接返回 index.html
+    // API 路径则跳过，交给后面的 NestJS 路由处理
+    app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
       if (req.method !== 'GET') return next();
       if (
         req.path.startsWith('/api/') ||
@@ -66,12 +68,7 @@ async function bootstrap() {
       ) {
         return next();
       }
-      // Only serve index.html for HTML requests (not assets)
-      if (req.accepts('html')) {
-        res.sendFile(join(clientDistPath, 'index.html'));
-      } else {
-        next();
-      }
+      res.sendFile(join(clientDistPath, 'index.html'));
     });
 
     logger.log(`静态文件托管: ${clientDistPath}`);
@@ -81,6 +78,8 @@ async function bootstrap() {
     );
   }
 
+  const port = process.env.PORT || 3000;
+  await app.listen(port);
   logger.log(`HomeHub running on http://localhost:${port}`);
 }
 bootstrap();
