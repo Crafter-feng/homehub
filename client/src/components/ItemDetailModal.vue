@@ -324,7 +324,7 @@ watch(() => props.show, (val) => {
 
 <style scoped>
 .item-detail-content {
-  max-height: 60vh;
+  height: 380px;
   overflow-y: auto;
 }
 

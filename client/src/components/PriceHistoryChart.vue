@@ -1,29 +1,28 @@
 <template>
   <div class="price-history-chart">
     <div class="price-section" v-if="priceHistory">
-      <!-- 价格概览卡片 -->
+      <!-- 价格概览：2x2 紧凑网格 -->
       <div class="price-overview">
         <div class="price-stat">
-          <span class="price-stat-label">当前价格</span>
+          <span class="price-stat-label">当前</span>
           <span class="price-stat-value price-primary">¥{{ priceHistory.currentPrice || '-' }}</span>
         </div>
         <div class="price-stat">
-          <span class="price-stat-label">平均价格</span>
+          <span class="price-stat-label">均价</span>
           <span class="price-stat-value">¥{{ priceHistory.avgPrice ? priceHistory.avgPrice.toFixed(2) : '-' }}</span>
         </div>
         <div class="price-stat">
-          <span class="price-stat-label">最低价格</span>
+          <span class="price-stat-label">最低</span>
           <span class="price-stat-value price-success">¥{{ priceHistory.minPrice || '-' }}</span>
         </div>
         <div class="price-stat">
-          <span class="price-stat-label">最高价格</span>
+          <span class="price-stat-label">最高</span>
           <span class="price-stat-value price-danger">¥{{ priceHistory.maxPrice || '-' }}</span>
         </div>
       </div>
 
       <!-- 价格趋势折线图 -->
       <div class="price-chart" v-if="priceHistory.history && priceHistory.history.length > 0">
-        <h4 class="chart-title">价格趋势</h4>
         <div class="chart-legend" v-if="storeColors.length > 0">
           <span v-for="store in storeColors" :key="store.name" class="legend-item">
             <span class="legend-dot" :style="{ background: store.color }"></span>
@@ -69,8 +68,8 @@ const priceHistory = ref<any>(null);
 
 // Chart constants
 const chartWidth = 320;
-const chartHeight = 150;
-const chartPadding = { top: 12, right: 12, bottom: 24, left: 40 };
+const chartHeight = 100;
+const chartPadding = { top: 8, right: 12, bottom: 20, left: 36 };
 
 const storeColorPalette = [
   '#409EFF', '#67C23A', '#E6A23C', '#F56C6C',
@@ -200,21 +199,22 @@ watch(() => props.itemId, () => loadPriceHistory(), { immediate: true });
 .price-section {
   display: flex;
   flex-direction: column;
-  gap: var(--hh-space-4);
+  gap: var(--hh-space-2);
 }
 
 .price-overview {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: var(--hh-space-3);
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--hh-space-2);
 }
 
 .price-stat {
   text-align: center;
+  padding: var(--hh-space-1) 0;
 }
 
 .price-stat-label {
-  font-size: var(--hh-text-xs);
+  font-size: 11px;
   color: var(--hh-text-tertiary);
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -222,10 +222,10 @@ watch(() => props.itemId, () => loadPriceHistory(), { immediate: true });
 
 .price-stat-value {
   display: block;
-  font-size: var(--hh-text-lg);
+  font-size: var(--hh-text-base);
   font-weight: var(--hh-weight-bold);
   color: var(--hh-text);
-  margin-top: var(--hh-space-1);
+  margin-top: 2px;
 }
 
 .price-primary { color: var(--hh-primary); }
@@ -234,34 +234,27 @@ watch(() => props.itemId, () => loadPriceHistory(), { immediate: true });
 
 .price-chart {
   border-top: 1px solid var(--hh-border-light);
-  padding-top: var(--hh-space-4);
-}
-
-.chart-title {
-  font-size: var(--hh-text-sm);
-  font-weight: var(--hh-weight-semibold);
-  color: var(--hh-text-secondary);
-  margin-bottom: var(--hh-space-3);
+  padding-top: var(--hh-space-2);
 }
 
 .chart-legend {
   display: flex;
-  gap: var(--hh-space-4);
-  margin-bottom: var(--hh-space-3);
+  gap: var(--hh-space-3);
+  margin-bottom: var(--hh-space-1);
   flex-wrap: wrap;
 }
 
 .legend-item {
   display: flex;
   align-items: center;
-  gap: var(--hh-space-1);
-  font-size: var(--hh-text-xs);
+  gap: 4px;
+  font-size: 11px;
   color: var(--hh-text-secondary);
 }
 
 .legend-dot {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
 }
 
@@ -275,14 +268,8 @@ watch(() => props.itemId, () => loadPriceHistory(), { immediate: true });
 }
 
 .axis-label {
-  font-size: 9px;
+  font-size: 8px;
   fill: var(--hh-text-tertiary);
   font-family: inherit;
-}
-
-@media (max-width: 480px) {
-  .price-overview {
-    grid-template-columns: repeat(2, 1fr);
-  }
 }
 </style>
