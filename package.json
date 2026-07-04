@@ -20,7 +20,10 @@
     "db:seed": "npm run db:seed -w server",
     "migrate:grocy": "npm run migrate:grocy -w server",
     "docker:up": "docker compose -f docker/docker-compose.yml up -d",
-    "docker:down": "docker compose -f docker/docker-compose.yml down"
+    "docker:down": "docker compose -f docker/docker-compose.yml down",
+    "docker:build": "docker compose -f docker/docker-compose.yml build",
+    "docker:logs": "docker compose -f docker/docker-compose.yml logs -f",
+    "docker:ps": "docker compose -f docker/docker-compose.yml ps"
   },
   "devDependencies": {
     "@vitest/coverage-v8": "^3.2.6",
