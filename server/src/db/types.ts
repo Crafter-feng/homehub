@@ -4,21 +4,18 @@ import * as schema from './schema';
 /**
  * Database type — intentionally `any` to avoid dual-driver union issues.
  *
- * Drizzle's SQLite and Postgres drivers share the same query-builder API at
- * runtime, but their TypeScript signatures are incompatible overload unions.
- * Using the concrete union `BetterSQLite3Database | NodePgDatabase` causes
- * every chained call (select/insert/update/delete/transaction) to fail
- * type-checking because TS cannot narrow the union across method chains.
+ * TODO: Fix this by:
+ * 1. Using SQLite-only type when PG support is not needed
+ * 2. OR creating a wrapper interface that both drivers implement
+ * 3. AND fixing all .get() calls to handle undefined returns
  *
- * All entity types below are properly inferred from the schema.
+ * This is the largest technical debt item in the project.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type Database = any;
 
 /**
  * Transaction context type for type-safe transaction callbacks.
- * Provides the same query-builder methods as Database but represents
- * a transactional context with automatic rollback on error.
  */
 export interface TransactionContext {
   select: Database['select'];
