@@ -453,7 +453,6 @@ export default {
     totalUsers: '用户总数',
     totalFamilies: '家庭总数',
     totalItems: '物品总数',
-    totalScans: '扫描次数',
     userEmail: '邮箱',
     userName: '姓名',
     createdAt: '注册时间',

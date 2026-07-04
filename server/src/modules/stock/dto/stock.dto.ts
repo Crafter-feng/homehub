@@ -273,6 +273,10 @@ export class StockInItemDto {
 
   @IsString()
   @IsOptional()
+  shop?: string;
+
+  @IsString()
+  @IsOptional()
   note?: string;
 
   @IsString()

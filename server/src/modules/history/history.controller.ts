@@ -23,9 +23,4 @@ export class HistoryController {
   getJournalSummary(@Request() req: any) {
     return this.historyService.getJournalSummary(req.user.familyId);
   }
-
-  @Get('scan-logs')
-  getScanLogs(@Request() req: any, @Query('limit') limit?: string) {
-    return this.historyService.getScanLogs(req.user.familyId, limit ? parseInt(limit) : undefined);
-  }
 }

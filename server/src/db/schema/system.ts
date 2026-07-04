@@ -57,6 +57,32 @@ export const sysRfidZones = sqliteTable('sys_rfid_zones', {
   notes: text('notes'),
 });
 
+// ── 硬件设备 ──
+export const sysHardwareDevices = sqliteTable('sys_hardware_devices', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  familyId: integer('family_id').notNull().references(() => families.id),
+  name: text('name').notNull(),
+  deviceType: text('device_type').notNull(),
+  connectionType: text('connection_type').default('virtual'),
+  connectionConfig: text('connection_config'),
+  config: text('config', { mode: 'json' }),
+  isOnline: integer('is_online', { mode: 'boolean' }).default(false),
+  lastOnlineAt: integer('last_online_at', { mode: 'timestamp' }),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
+});
+
+// ── 打印任务 ──
+export const sysPrintJobs = sqliteTable('sys_print_jobs', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  familyId: integer('family_id').notNull().references(() => families.id),
+  content: text('content').notNull(),
+  outputType: text('output_type').notNull(),
+  copies: integer('copies').default(1),
+  options: text('options', { mode: 'json' }),
+  status: text('status').default('queued'),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
+});
+
 // ── 自动化触发器 ──
 export const sysAutomationTriggers = sqliteTable('sys_automation_triggers', {
   id: integer('id').primaryKey({ autoIncrement: true }),

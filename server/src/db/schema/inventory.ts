@@ -103,6 +103,8 @@ export const invStockTransactions = sqliteTable('inv_stock_transactions', {
     enum: ['manual', 'barcode', 'nfc', 'rfid', 'voice', 'vision', 'mcp'],
   }).notNull().default('manual'),
   note: text('note'),
+  price: real('price'),
+  shop: text('shop'),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
 });
 

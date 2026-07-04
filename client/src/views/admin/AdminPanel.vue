@@ -23,11 +23,6 @@
                 <template #suffix> 件</template>
               </n-statistic>
             </n-card>
-            <n-card class="stat-card" size="small">
-              <n-statistic :value="stats.totalScans" :label="t('admin.totalScans')">
-                <template #suffix> 次</template>
-              </n-statistic>
-            </n-card>
           </div>
         </n-tab-pane>
 
@@ -75,7 +70,7 @@ import { useI18n } from '@/locales';
 const { t } = useI18n();
 const activeTab = ref('overview');
 
-const stats = ref({ totalUsers: 0, totalFamilies: 0, totalItems: 0, totalScans: 0 });
+const stats = ref({ totalUsers: 0, totalFamilies: 0, totalItems: 0 });
 const users = ref<any[]>([]);
 const families = ref<any[]>([]);
 const plugins = ref<any[]>([]);

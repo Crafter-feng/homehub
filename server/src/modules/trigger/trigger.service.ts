@@ -327,9 +327,4 @@ export class TriggerService {
 
     return { installed: results.filter((r: any) => r.action === 'created').length, results };
   }
-
-  // === 扫描日志（已移除 DB 存储，使用 Logger 输出）===
-  async getScanLogs(_familyId: number, _limit: number = 50) {
-    return [];
-  }
 }

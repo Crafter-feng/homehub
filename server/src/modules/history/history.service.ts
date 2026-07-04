@@ -156,9 +156,4 @@ export class HistoryService {
 
     return { byType, byUser, byItem };
   }
-
-  /** 扫描日志 */
-  async getScanLogs(_familyId: number, _limit?: number) {
-    return [];
-  }
 }

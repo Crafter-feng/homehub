@@ -10,6 +10,9 @@ import { TriggerService } from '../trigger/trigger.service';
 import { ScannerService } from '../scanner/scanner.service';
 import { LocationsService } from '../master-data/locations/locations.service';
 import { CategoriesService } from '../master-data/categories/categories.service';
+import { TagsService } from '../master-data/tags/tags.service';
+import { BrandsService } from '../master-data/brands/brands.service';
+import { UnitsService } from '../master-data/units/units.service';
 import { MealPlansService } from '../meal-plans/meal-plans.service';
 import { DashboardService } from '../dashboard/dashboard.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -36,6 +39,9 @@ export class McpService {
     private readonly scannerService: ScannerService,
     private readonly locationsService: LocationsService,
     private readonly categoriesService: CategoriesService,
+    private readonly tagsService: TagsService,
+    private readonly brandsService: BrandsService,
+    private readonly unitsService: UnitsService,
     private readonly mealPlansService: MealPlansService,
     private readonly dashboardService: DashboardService,
     private readonly notificationsService: NotificationsService,
@@ -164,18 +170,15 @@ export class McpService {
     if (resolvedPath.startsWith('/v1/mdCategories')) {
       return this.dispatchCategories(method, resolvedPath, params, familyId, userId);
     }
-    // ── Tags / Brands / Units (read-only) ──
+    // ── Tags / Brands / Units ──
     if (resolvedPath.startsWith('/v1/mdTags') && method === 'GET') {
-      // TODO: inject TagsService when available
-      return { mdTags: [] };
+      return { mdTags: await this.tagsService.list(familyId) };
     }
     if (resolvedPath.startsWith('/v1/mdBrands') && method === 'GET') {
-      // TODO: inject BrandsService when available
-      return { mdBrands: [] };
+      return { mdBrands: await this.brandsService.list(familyId) };
     }
     if (resolvedPath.startsWith('/v1/mdUnits') && method === 'GET') {
-      // TODO: inject UnitsService when available
-      return { mdUnits: [] };
+      return { mdUnits: await this.unitsService.list(familyId) };
     }
     // ── Dashboard ──
     if (resolvedPath.startsWith('/v1/dashboard/')) {

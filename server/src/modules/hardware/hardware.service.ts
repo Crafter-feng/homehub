@@ -1,34 +1,26 @@
 import { Injectable, Inject, NotFoundException } from '@nestjs/common';
+import { DATABASE_TOKEN } from '../../db/database.module';
+import { eq, and, desc } from 'drizzle-orm';
+import { sysHardwareDevices, sysPrintJobs } from '../../db/schema';
 import { RegisterDeviceDto, PrintJobDto, NfcWriteDto } from './dto/hardware.dto';
 
 /**
  * HardwareService — Hardware Abstraction Layer (HAL)
  *
  * Manages hardware device registration and output job dispatching.
- * For MVP, this provides:
- * - Device registration (printers, NFC writers)
- * - Print job queue (thermal/label/PDF)
- * - NFC write instructions
- * - PDF export
- *
- * Actual hardware drivers (USB, Bluetooth) are stubs — the service records
- * jobs and provides connection details for the client to execute.
+ * Uses database persistence for devices and print jobs.
  */
 @Injectable()
 export class HardwareService {
-  // In-memory device registry (MVP; Phase 2: persist to DB)
-  private devices: Map<number, any> = new Map();
-  private nextDeviceId = 1;
-  private printJobs: any[] = [];
-
-  constructor() {}
+  constructor(
+    @Inject(DATABASE_TOKEN) private readonly db: any,
+  ) {}
 
   /**
    * Register a new hardware device.
    */
   async registerDevice(familyId: number, dto: RegisterDeviceDto) {
-    const device = {
-      id: this.nextDeviceId++,
+    return this.db.insert(sysHardwareDevices).values({
       familyId,
       name: dto.name,
       deviceType: dto.deviceType,
@@ -36,33 +28,26 @@ export class HardwareService {
       connectionConfig: dto.connectionConfig || '{}',
       config: dto.config || {},
       isOnline: false,
-      lastOnlineAt: null,
-      createdAt: new Date(),
-    };
-
-    this.devices.set(device.id, device);
-    return device;
+    }).returning().get();
   }
 
   /**
    * List registered devices for a family.
    */
   async listDevices(familyId: number) {
-    const result: any[] = [];
-    this.devices.forEach((d) => {
-      if (d.familyId === familyId) result.push(d);
-    });
-    return result;
+    return this.db.select().from(sysHardwareDevices)
+      .where(eq(sysHardwareDevices.familyId, familyId))
+      .all();
   }
 
   /**
    * Get device by ID.
    */
   async getDevice(id: number, familyId: number) {
-    const device = this.devices.get(id);
-    if (!device || device.familyId !== familyId) {
-      throw new NotFoundException(`设备 #${id} 不存在`);
-    }
+    const device = await this.db.select().from(sysHardwareDevices)
+      .where(and(eq(sysHardwareDevices.id, id), eq(sysHardwareDevices.familyId, familyId)))
+      .get();
+    if (!device) throw new NotFoundException(`设备 #${id} 不存在`);
     return device;
   }
 
@@ -70,11 +55,20 @@ export class HardwareService {
    * Update device configuration.
    */
   async updateDevice(id: number, familyId: number, updates: Partial<RegisterDeviceDto>) {
-    const device = await this.getDevice(id, familyId);
-    if (updates.name) device.name = updates.name;
-    if (updates.config) device.config = { ...device.config, ...updates.config };
-    this.devices.set(id, device);
-    return device;
+    await this.getDevice(id, familyId);
+
+    const updateData: Record<string, any> = {};
+    if (updates.name) updateData.name = updates.name;
+    if (updates.config) updateData.config = updates.config;
+
+    if (Object.keys(updateData).length > 0) {
+      await this.db.update(sysHardwareDevices)
+        .set(updateData)
+        .where(eq(sysHardwareDevices.id, id))
+        .run();
+    }
+
+    return this.getDevice(id, familyId);
   }
 
   /**
@@ -82,7 +76,9 @@ export class HardwareService {
    */
   async deleteDevice(id: number, familyId: number) {
     await this.getDevice(id, familyId);
-    this.devices.delete(id);
+    await this.db.delete(sysHardwareDevices)
+      .where(eq(sysHardwareDevices.id, id))
+      .run();
     return { success: true };
   }
 
@@ -90,31 +86,27 @@ export class HardwareService {
    * Submit a print job.
    */
   async submitPrintJob(familyId: number, dto: PrintJobDto) {
-    const job = {
-      id: this.printJobs.length + 1,
+    const job = await this.db.insert(sysPrintJobs).values({
       familyId,
       content: dto.content,
       outputType: dto.outputType,
       copies: dto.copies || 1,
       options: dto.options || {},
       status: 'queued',
-      createdAt: new Date(),
-    };
-
-    this.printJobs.push(job);
+    }).returning().get();
 
     // For PDF output, provide inline rendering data
     if (dto.outputType === 'pdf') {
       return {
         ...job,
-        downloadUrl: null, // Client renders SVG/HTML to PDF
+        downloadUrl: null,
         instructions: '使用浏览器打印功能或 html2pdf 库将内容导出为 PDF',
       };
     }
 
     // For thermal/label, provide connection info for a registered printer
     const printers = await this.listDevices(familyId);
-    const printer = printers.find((d) =>
+    const printer = printers.find((d: any) =>
       d.deviceType === 'printer_thermal' || d.deviceType === 'printer_label'
     );
 
@@ -131,7 +123,10 @@ export class HardwareService {
    * List print jobs.
    */
   async listPrintJobs(familyId: number) {
-    return this.printJobs.filter((j) => j.familyId === familyId);
+    return this.db.select().from(sysPrintJobs)
+      .where(eq(sysPrintJobs.familyId, familyId))
+      .orderBy(desc(sysPrintJobs.createdAt))
+      .all();
   }
 
   /**
@@ -149,21 +144,13 @@ export class HardwareService {
           instructions: '使用 Web NFC API (nfcWriter.push) 写入',
         };
         break;
-      case 'ndef_smartposter':
-        ndefPayload = {
-          type: 'NDEF Smart Poster Record',
-          uri: dto.payload,
-          title: 'HomeHub Tag',
-          instructions: '使用 NFC Tools 或 Web NFC API 写入 NTAG213 或更大容量标签',
-        };
-        break;
       case 'ndef_text':
       default:
         ndefPayload = {
           type: 'NDEF Text Record',
           text: dto.payload,
-          language: 'zh-CN',
-          encoding: 'UTF-8',
+          language: 'zh',
+          tnf: 'Well Known',
           instructions: '使用 Web NFC API (nfcWriter.push) 写入',
         };
         break;
@@ -172,7 +159,7 @@ export class HardwareService {
     return {
       format: dto.format || 'ndef_text',
       payload: ndefPayload,
-      writeMethod: 'web_nfc_api',
+      instructions: '确保设备支持 NFC 且浏览器已启用 Web NFC API',
     };
   }
 }

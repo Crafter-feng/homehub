@@ -150,7 +150,7 @@
 import { ref, computed, onMounted, h } from 'vue';
 import { NButton, NPopconfirm, useMessage } from 'naive-ui';
 import { useI18n } from '@/locales';
-import api from '@/api/client';
+import { budgetApi } from '@/api/client';
 import {
   RefreshOutline,
   AddOutline,
@@ -270,10 +270,10 @@ async function handleSubmit() {
       date: form.value.date,
     };
     if (editingId.value) {
-      await api.put(`/budget/entries/${editingId.value}`, payload);
+      await budgetApi.updateEntry(editingId.value, payload);
       message.success(t('common.success'));
     } else {
-      await api.post('/budget/entries', payload);
+      await budgetApi.createEntry(payload);
       message.success(t('common.success'));
     }
     closeModal();
@@ -287,7 +287,7 @@ async function handleSubmit() {
 
 async function deleteEntry(id: number) {
   try {
-    await api.delete(`/budget/entries/${id}`);
+    await budgetApi.deleteEntry(id);
     message.success(t('common.success'));
     await loadData();
   } catch {
@@ -299,9 +299,9 @@ async function loadData() {
   loading.value = true;
   try {
     const [entriesRes, summaryRes, subCostRes] = await Promise.all([
-      api.get('/budget/entries', { params: { limit: 100 } }),
-      api.get('/budget/summary'),
-      api.get('/budget/subscriptions/monthly-cost'),
+      budgetApi.listEntries({ limit: 100 }),
+      budgetApi.getSummary(),
+      budgetApi.getMonthlyCost(),
     ]);
     entries.value = entriesRes.data.entries || [];
     summary.value = summaryRes.data;

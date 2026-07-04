@@ -111,7 +111,7 @@ import {
   useMessage,
 } from 'naive-ui';
 import type { DataTableColumns } from 'naive-ui';
-import api from '@/api/client';
+import { hardwareApi } from '@/api/client';
 
 const message = useMessage();
 const activeTab = ref('devices');
@@ -173,7 +173,7 @@ const nfcFormatOptions = [
 async function loadDevices() {
   loadingDevices.value = true;
   try {
-    const { data } = await api.get('/hardware/devices');
+    const { data } = await hardwareApi.listDevices();
     devices.value = data.data || data;
   } catch (e: any) {
     message.error('加载设备列表失败');
@@ -185,7 +185,7 @@ async function loadDevices() {
 async function loadPrintJobs() {
   loadingPrintJobs.value = true;
   try {
-    const { data } = await api.get('/hardware/print');
+    const { data } = await hardwareApi.listPrintJobs();
     printJobs.value = data.data || data;
   } catch (e: any) {
     message.error('加载打印任务失败');
@@ -199,7 +199,7 @@ async function handlePrint() {
   if (!printForm.content || !printForm.outputType) return;
   submittingPrint.value = true;
   try {
-    await api.post('/hardware/print', {
+    await hardwareApi.print({
       content: printForm.content,
       outputType: printForm.outputType,
     });
@@ -220,7 +220,7 @@ async function handleNfcWrite() {
   submittingNfc.value = true;
   // 等待用户将 NFC 标签靠近写入器
   try {
-    await api.post('/hardware/nfc/write', {
+    await hardwareApi.nfcWrite({
       text: nfcForm.text,
       format: nfcForm.format,
     });

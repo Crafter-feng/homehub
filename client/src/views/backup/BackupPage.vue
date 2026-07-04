@@ -57,7 +57,7 @@
 import { ref, onMounted, h } from 'vue';
 import { NButton, NPopconfirm, useMessage } from 'naive-ui';
 import { useI18n } from '@/locales';
-import api from '@/api/client';
+import { backupApi } from '@/api/client';
 import { AddOutline, DownloadOutline, TrashOutline } from '@vicons/ionicons5';
 
 const { t } = useI18n();
@@ -123,7 +123,7 @@ function formatDate(dateStr: string) {
 async function createBackup() {
   creating.value = true;
   try {
-    await api.post('/backup', { name: `手动备份 ${new Date().toLocaleDateString('zh-CN')}` });
+    await backupApi.create(`手动备份 ${new Date().toLocaleDateString('zh-CN')}`);
     message.success(t('common.success'));
     await loadData();
   } catch {
@@ -135,7 +135,7 @@ async function createBackup() {
 
 async function restoreBackup(filename: string, _name: string) {
   try {
-    await api.post('/backup/restore', { filename, createPreRestoreBackup: true });
+    await backupApi.restore(filename, true);
     message.success('恢复成功');
   } catch {
     message.error(t('common.error'));
@@ -144,7 +144,7 @@ async function restoreBackup(filename: string, _name: string) {
 
 async function deleteBackup(filename: string) {
   try {
-    await api.delete(`/backup/${filename}`);
+    await backupApi.delete(filename);
     message.success(t('common.success'));
     await loadData();
   } catch {
@@ -156,8 +156,8 @@ async function loadData() {
   loading.value = true;
   try {
     const [listRes, storageRes] = await Promise.all([
-      api.get('/backup'),
-      api.get('/backup/storage'),
+      backupApi.list(),
+      backupApi.getStorage(),
     ]);
     backups.value = listRes.data || [];
     storageInfo.value = storageRes.data;

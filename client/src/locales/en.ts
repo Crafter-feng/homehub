@@ -453,7 +453,6 @@ export default {
     totalUsers: 'Total Users',
     totalFamilies: 'Total Families',
     totalItems: 'Total Items',
-    totalScans: 'Total Scans',
     userEmail: 'Email',
     userName: 'Name',
     createdAt: 'Registered',
