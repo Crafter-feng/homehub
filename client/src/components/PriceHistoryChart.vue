@@ -204,8 +204,8 @@ watch(() => props.itemId, () => loadPriceHistory(), { immediate: true });
 
 .price-overview {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: var(--hh-space-2);
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--hh-space-1);
 }
 
 .price-stat {

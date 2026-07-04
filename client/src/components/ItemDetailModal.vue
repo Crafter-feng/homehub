@@ -4,7 +4,7 @@
     @update:show="$emit('update:show', $event)"
     preset="card"
     :title="item?.name || ''"
-    style="width: 95vw; max-width: 600px; height: 520px"
+    style="width: 95vw; max-width: 600px"
     :segmented="{ content: true, footer: true }"
     :mask-closable="true"
     :close-on-esc="true"
@@ -324,7 +324,7 @@ watch(() => props.show, (val) => {
 
 <style scoped>
 .item-detail-content {
-  height: 380px;
+  max-height: 55vh;
   overflow-y: auto;
 }
 
