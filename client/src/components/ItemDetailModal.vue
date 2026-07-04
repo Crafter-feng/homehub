@@ -16,6 +16,7 @@
           <n-tag size="small" round :bordered="false" :type="getCategoryColor(item.type)">
             {{ item.type }}
           </n-tag>
+          <n-tag v-if="item.spec" size="small" round :bordered="false" type="info">{{ item.spec }}</n-tag>
           <n-tag v-if="isExpired" size="small" round :bordered="false" type="error">已过期</n-tag>
           <n-tag v-else-if="isExpiringSoon" size="small" round :bordered="false" type="warning">即将过期</n-tag>
           <n-tag v-if="isLowStock" size="small" round :bordered="false" type="warning">低库存</n-tag>
@@ -75,59 +76,7 @@
 
           <!-- 价格追踪 Tab -->
           <n-tab-pane name="price" tab="价格追踪">
-            <div class="price-section" v-if="priceHistory">
-              <!-- 价格概览卡片 -->
-              <div class="price-overview">
-                <div class="price-stat">
-                  <span class="price-stat-label">当前价格</span>
-                  <span class="price-stat-value price-primary">¥{{ priceHistory.currentPrice || '-' }}</span>
-                </div>
-                <div class="price-stat">
-                  <span class="price-stat-label">平均价格</span>
-                  <span class="price-stat-value">¥{{ priceHistory.avgPrice ? priceHistory.avgPrice.toFixed(2) : '-' }}</span>
-                </div>
-                <div class="price-stat">
-                  <span class="price-stat-label">最低价格</span>
-                  <span class="price-stat-value price-success">¥{{ priceHistory.minPrice || '-' }}</span>
-                </div>
-                <div class="price-stat">
-                  <span class="price-stat-label">最高价格</span>
-                  <span class="price-stat-value price-danger">¥{{ priceHistory.maxPrice || '-' }}</span>
-                </div>
-              </div>
-
-              <!-- 价格趋势折线图 -->
-              <div class="price-chart" v-if="priceHistory.history && priceHistory.history.length > 0">
-                <h4 class="chart-title">价格趋势</h4>
-                <div class="chart-legend">
-                  <span v-for="store in storeColors" :key="store.name" class="legend-item">
-                    <span class="legend-dot" :style="{ background: store.color }"></span>
-                    {{ store.name }}
-                  </span>
-                </div>
-                <div class="chart-container">
-                  <svg :viewBox="`0 0 ${chartWidth} ${chartHeight}`" class="line-chart">
-                    <text v-for="(tick, idx) in yTicks" :key="'y'+idx"
-                      :x="chartPadding.left - 6" :y="tick.y + 3"
-                      text-anchor="end" class="axis-label">¥{{ tick.value }}</text>
-                    <text v-for="(tick, idx) in xTicks" :key="'x'+idx"
-                      :x="tick.x" :y="chartHeight - 4"
-                      text-anchor="middle" class="axis-label">{{ tick.label }}</text>
-                    <line v-for="(tick, idx) in yTicks" :key="'gy'+idx"
-                      :x1="chartPadding.left" :y1="tick.y" :x2="chartWidth - chartPadding.right" :y2="tick.y"
-                      stroke="#e0e0e6" stroke-width="0.5" stroke-dasharray="3,3" />
-                    <polyline v-for="(line, idx) in chartLines" :key="'line'+idx"
-                      :points="line.points"
-                      fill="none" :stroke="line.color" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
-                    <circle v-for="(point, idx) in chartPoints" :key="'pt'+idx"
-                      :cx="point.x" :cy="point.y" r="3" :fill="point.color" stroke="white" stroke-width="1.5" />
-                  </svg>
-                </div>
-              </div>
-
-              <n-empty v-else description="暂无价格记录" />
-            </div>
-            <n-empty v-else description="加载中..." />
+            <PriceHistoryChart v-if="item" :item-id="item.id" />
           </n-tab-pane>
 
           <!-- 批次 Tab -->
@@ -192,7 +141,7 @@
         <n-button size="small" @click="openStockIn">入库</n-button>
         <n-button size="small" @click="showConsumeModal = true">消耗</n-button>
         <n-button size="small" @click="showTransferModal = true">转移</n-button>
-        <n-button size="small" type="error" ghost @click="handleDelete">删除</n-button>
+        <n-button size="small" type="error" ghost @click="handleDelete(item.id, item.name)">删除</n-button>
       </n-space>
     </template>
 
@@ -258,14 +207,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
+import { ref, watch } from 'vue';
 import {
   NModal, NSpin, NButton, NSpace, NFormItem, NEmpty,
   NInputNumber, NInput, NSelect, NTag, NTabs, NTabPane, useMessage, useDialog,
 } from 'naive-ui';
 import { stockApi, locationsApi } from '@/api/client';
-import type { Item, StockTransaction, Location } from '@/shared/types';
+import PriceHistoryChart from './PriceHistoryChart.vue';
 import { getCategoryColor, getHistoryColor } from '@/utils/format';
+import { useStockItem } from '@/composables/useStockItem';
 
 const props = defineProps<{
   show: boolean;
@@ -281,154 +231,34 @@ const emit = defineEmits<{
 const message = useMessage();
 const dialog = useDialog();
 
-const item = ref<Item | null>(null);
-const history = ref<StockTransaction[]>([]);
-const locations = ref<Location[]>([]);
-const loading = ref(false);
-
-const showConsumeModal = ref(false);
-const showTransferModal = ref(false);
-const showStockInModal = ref(false);
-const consumeQuantity = ref(1);
-const consumeNote = ref('');
-const stockInQuantity = ref(1);
-const stockInPrice = ref<number | null>(null);
-const stockInShop = ref('');
-const stockInNote = ref('');
-const transferLocation = ref<number | null>(null);
+const {
+  item, history, locations, loading,
+  showConsumeModal, showTransferModal, showStockInModal,
+  consumeQuantity, consumeNote,
+  stockInQuantity, stockInPrice, stockInShop, stockInNote,
+  transferLocation, locationSelectOptions,
+  isExpired, isExpiringSoon, isLowStock,
+  getLocationName, formatDate, formatDateTime,
+  loadData, openStockIn, handleStockIn, handleConsume, handleTransfer, handleDelete,
+} = useStockItem({
+  onUpdated: () => emit('updated'),
+  onDeleted: () => { emit('update:show', false); emit('deleted'); },
+});
 
 // Batch state
 const batches = ref<any[]>([]);
 const compacting = ref(false);
 
-// Price history state
-const priceHistory = ref<any>(null);
-
-const locationSelectOptions = computed(() =>
-  locations.value.map(l => ({ label: l.name, value: l.id }))
-);
-
-const isExpired = computed(() => {
-  if (!item.value?.expiryDate) return false;
-  return new Date(item.value.expiryDate) < new Date();
-});
-
-const isExpiringSoon = computed(() => {
-  if (!item.value?.expiryDate) return false;
-  const diff = new Date(item.value.expiryDate).getTime() - Date.now();
-  return diff > 0 && diff < 7 * 24 * 60 * 60 * 1000;
-});
-
-const isLowStock = computed(() => {
-  if (!item.value) return false;
-  return item.value.minStock !== null && item.value.quantity <= item.value.minStock;
-});
-
-const getLocationName = (locationId: number | null): string => {
-  if (!locationId) return '未指定';
-  const loc = locations.value.find(l => l.id === locationId);
-  return loc ? loc.name : String(locationId);
+const typeTranslationMap: Record<string, string> = {
+  'add': '入库',
+  'stock-in': '入库',
+  'consume': '消耗',
+  'transfer': '转移',
+  'adjust': '调整',
 };
 
-const formatDate = (dateStr: string | Date): string => {
-  if (!dateStr) return '-';
-  return new Date(dateStr).toLocaleDateString('zh-CN');
-};
+const translateType = (type: string): string => typeTranslationMap[type] || type;
 
-const formatDateTime = (dateStr: string | Date): string => {
-  if (!dateStr) return '-';
-  return new Date(dateStr).toLocaleString('zh-CN');
-};
-
-const loadData = async () => {
-  if (!props.itemId) return;
-  loading.value = true;
-  try {
-    const [itemRes, historyRes, locRes] = await Promise.all([
-      stockApi.getById(props.itemId),
-      stockApi.getHistory(props.itemId),
-      locationsApi.list(),
-    ]);
-    item.value = itemRes.data;
-    history.value = historyRes.data || [];
-    locations.value = (locRes.data || []) as Location[];
-    loadBatches();
-    loadPriceHistory();
-  } catch {
-    message.error('加载失败');
-  } finally {
-    loading.value = false;
-  }
-};
-
-watch(() => props.show, (val) => {
-  if (val && props.itemId) loadData();
-  if (!val) {
-    item.value = null;
-    history.value = [];
-  }
-});
-
-const handleConsume = async () => {
-  if (!item.value) return;
-  try {
-    await stockApi.consume(item.value.id, { quantity: consumeQuantity.value, note: consumeNote.value });
-    message.success('消耗成功');
-    showConsumeModal.value = false;
-    loadData();
-    emit('updated');
-  } catch (e: unknown) {
-    const err = e as { response?: { data?: { message?: string } } };
-    message.error(err.response?.data?.message || '操作失败');
-  }
-};
-
-const openStockIn = () => {
-  stockInQuantity.value = 1;
-  stockInPrice.value = null;
-  stockInShop.value = '';
-  stockInNote.value = '';
-  showStockInModal.value = true;
-};
-
-const handleStockIn = async () => {
-  if (!item.value) return;
-  try {
-    await stockApi.stockIn(item.value.id, {
-      quantity: stockInQuantity.value,
-      note: stockInNote.value,
-      price: stockInPrice.value ?? undefined,
-      shop: stockInShop.value || undefined,
-    });
-    message.success('入库成功');
-    showStockInModal.value = false;
-    loadData();
-    emit('updated');
-  } catch (e: unknown) {
-    const err = e as { response?: { data?: { message?: string } } };
-    message.error(err.response?.data?.message || '操作失败');
-  }
-};
-
-const handleTransfer = async () => {
-  if (!item.value) return;
-  if (!transferLocation.value) {
-    message.warning('请选择目标位置');
-    return;
-  }
-  try {
-    await stockApi.transfer(item.value.id, { toLocationId: transferLocation.value });
-    message.success('转移成功');
-    showTransferModal.value = false;
-    loadData();
-    emit('updated');
-  } catch (e: unknown) {
-    const err = e as { response?: { data?: { message?: string } } };
-    message.error(err.response?.data?.message || '操作失败');
-  }
-};
-
-// Batch methods
 const loadBatches = async () => {
   if (!item.value) return;
   try {
@@ -438,149 +268,6 @@ const loadBatches = async () => {
     batches.value = [];
   }
 };
-
-// Price history methods
-const loadPriceHistory = async () => {
-  if (!item.value) return;
-  try {
-    const res = await stockApi.getPriceHistory(item.value.id);
-    priceHistory.value = res.data;
-  } catch {
-    priceHistory.value = null;
-  }
-};
-
-const formatDateShort = (dateStr: string | Date): string => {
-  if (!dateStr) return '';
-  const d = new Date(dateStr);
-  return `${d.getMonth() + 1}/${d.getDate()}`;
-};
-
-// Chart constants
-const chartWidth = 320;
-const chartHeight = 150;
-const chartPadding = { top: 12, right: 12, bottom: 24, left: 40 };
-
-// Store colors (similar to Grocy's color scheme)
-const storeColorPalette = [
-  '#409EFF', // blue
-  '#67C23A', // green
-  '#E6A23C', // yellow
-  '#F56C6C', // red
-  '#909399', // gray
-  '#00CED1', // teal
-  '#FF69B4', // pink
-  '#8B4513', // brown
-];
-
-const storeColors = computed(() => {
-  if (!priceHistory.value?.history) return [];
-  const stores = new Set<string>();
-  priceHistory.value.history.forEach((r: any) => stores.add(r.store));
-  return Array.from(stores).map((name, idx) => ({
-    name,
-    color: storeColorPalette[idx % storeColorPalette.length],
-  }));
-});
-
-// Type translation map
-const typeTranslationMap: Record<string, string> = {
-  'add': '入库',
-  'stock-in': '入库',
-  'consume': '消耗',
-  'transfer': '转移',
-  'adjust': '调整',
-  'inventory-correction': '库存调整',
-};
-
-const translateType = (type: string): string => {
-  return typeTranslationMap[type] || type;
-};
-
-const priceRange = computed(() => {
-  if (!priceHistory.value?.history?.length) return { min: 0, max: 100 };
-  const prices = priceHistory.value.history.map((r: any) => r.price).filter((p: any) => p != null);
-  if (prices.length === 0) return { min: 0, max: 100 };
-  const min = Math.min(...prices);
-  const max = Math.max(...prices);
-  const padding = (max - min) * 0.1 || 10;
-  return { min: Math.max(0, min - padding), max: max + padding };
-});
-
-const yTicks = computed(() => {
-  const { min, max } = priceRange.value;
-  const ticks = [];
-  const steps = 4;
-  for (let i = 0; i <= steps; i++) {
-    const value = min + (max - min) * (i / steps);
-    const y = chartPadding.top + (chartHeight - chartPadding.top - chartPadding.bottom) * (1 - i / steps);
-    ticks.push({ value: value.toFixed(value >= 10 ? 0 : 1), y });
-  }
-  return ticks;
-});
-
-const xTicks = computed(() => {
-  if (!priceHistory.value?.history?.length) return [];
-  const history = [...priceHistory.value.history].reverse().filter((r: any) => r.price != null);
-  if (history.length === 0) return [];
-  const ticks = [];
-  const maxTicks = Math.min(history.length, 5);
-  for (let i = 0; i < maxTicks; i++) {
-    const idx = Math.floor(i * (history.length - 1) / Math.max(maxTicks - 1, 1));
-    const x = chartPadding.left + (chartWidth - chartPadding.left - chartPadding.right) * idx / Math.max(history.length - 1, 1);
-    ticks.push({ label: formatDateShort(history[idx].date), x });
-  }
-  return ticks;
-});
-
-const chartLines = computed(() => {
-  if (!priceHistory.value?.history?.length) return [];
-  const history = [...priceHistory.value.history].reverse();
-  const { min, max } = priceRange.value;
-
-  const storeData = new Map<string, Array<any>>();
-  history.forEach((r: any) => {
-    if (r.price == null) return;
-    if (!storeData.has(r.store)) storeData.set(r.store, []);
-    storeData.get(r.store)!.push(r);
-  });
-
-  const lines: Array<{ points: string; color: string }> = [];
-  storeColors.value.forEach(({ name, color }) => {
-    const data = storeData.get(name) || [];
-    if (data.length < 2) return;
-
-    const allWithPrice = history.filter((r: any) => r.price != null);
-    const points = data.map((r: any) => {
-      const idx = allWithPrice.indexOf(r);
-      const x = chartPadding.left + (chartWidth - chartPadding.left - chartPadding.right) * idx / Math.max(allWithPrice.length - 1, 1);
-      const y = chartPadding.top + (chartHeight - chartPadding.top - chartPadding.bottom) * (1 - (r.price - min) / (max - min));
-      return `${x},${y}`;
-    }).join(' ');
-
-    lines.push({ points, color });
-  });
-
-  return lines;
-});
-
-const chartPoints = computed(() => {
-  if (!priceHistory.value?.history?.length) return [];
-  const history = [...priceHistory.value.history].reverse();
-  const { min, max } = priceRange.value;
-  const allWithPrice = history.filter((r: any) => r.price != null);
-
-  const storeColorMap = new Map(storeColors.value.map(s => [s.name, s.color]));
-  const points: Array<{ x: number; y: number; color: string }> = [];
-
-  allWithPrice.forEach((r: any, idx: number) => {
-    const x = chartPadding.left + (chartWidth - chartPadding.left - chartPadding.right) * idx / Math.max(allWithPrice.length - 1, 1);
-    const y = chartPadding.top + (chartHeight - chartPadding.top - chartPadding.bottom) * (1 - (r.price - min) / (max - min));
-    points.push({ x, y, color: storeColorMap.get(r.store) || '#909399' });
-  });
-
-  return points;
-});
 
 const isBatchExpired = (batch: any) => {
   return batch.expiryDate && new Date(batch.expiryDate) < new Date();
@@ -593,7 +280,7 @@ const handleCompactBatches = async () => {
     const res = await stockApi.compactBatches(item.value.id);
     message.success(res.data?.message || '合并完成');
     loadBatches();
-    loadData();
+    loadData(item.value.id);
   } catch {
     message.error('合并失败');
   } finally {
@@ -616,7 +303,7 @@ const deleteBatch = async (batch: any) => {
         await stockApi.deleteBatch(batch.id);
         message.success('删除成功');
         loadBatches();
-        loadData();
+        if (item.value) loadData(item.value.id);
       } catch {
         message.error('删除失败');
       }
@@ -624,26 +311,15 @@ const deleteBatch = async (batch: any) => {
   });
 };
 
-const handleDelete = () => {
-  if (!item.value) return;
-  dialog.warning({
-    title: '确认删除',
-    content: `确定要删除「${item.value.name}」吗？此操作不可撤销。`,
-    positiveText: '删除',
-    negativeText: '取消',
-    onPositiveClick: async () => {
-      try {
-        await stockApi.delete(item.value!.id);
-        message.success('删除成功');
-        emit('update:show', false);
-        emit('deleted');
-      } catch (e: unknown) {
-        const err = e as { response?: { data?: { message?: string } } };
-        message.error(err.response?.data?.message || '删除失败');
-      }
-    },
-  });
-};
+watch(() => props.show, (val) => {
+  if (val && props.itemId) {
+    loadData(props.itemId);
+    loadBatches();
+  }
+  if (!val) {
+    batches.value = [];
+  }
+});
 </script>
 
 <style scoped>
@@ -750,14 +426,6 @@ const handleDelete = () => {
 
 .history-section {
   margin-top: 8px;
-}
-
-.detail-section-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--hh-text-secondary, #666);
-  text-transform: uppercase;
-  margin-bottom: 8px;
 }
 
 .timeline {
@@ -888,141 +556,5 @@ const handleDelete = () => {
 
 .text-danger {
   color: var(--hh-error, #e53e3e);
-}
-
-/* Price section */
-.price-section {
-  padding: 8px 0;
-}
-
-.price-overview {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
-.price-stat {
-  padding: 10px 12px;
-  border: 1px solid var(--hh-border-light, #e0e0e6);
-  border-radius: 8px;
-  background: var(--hh-bg-secondary, #f5f5f5);
-}
-
-.price-stat-label {
-  display: block;
-  font-size: 12px;
-  color: var(--hh-text-secondary);
-  margin-bottom: 4px;
-}
-
-.price-stat-value {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--hh-text);
-}
-
-.price-primary {
-  color: var(--hh-primary, #409eff);
-}
-
-.price-success {
-  color: var(--hh-success, #67c23a);
-}
-
-.price-danger {
-  color: var(--hh-error, #e53e3e);
-}
-
-.price-chart {
-  margin-bottom: 16px;
-}
-
-.chart-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--hh-text);
-  margin-bottom: 8px;
-}
-
-.chart-legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin-bottom: 8px;
-  font-size: 12px;
-  color: var(--hh-text-secondary);
-}
-
-.legend-item {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.legend-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-}
-
-.chart-container {
-  padding: 4px;
-  background: var(--hh-bg-secondary, #f5f5f5);
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-.line-chart {
-  width: 100%;
-  height: auto;
-  display: block;
-}
-
-.axis-label {
-  font-size: 9px;
-  fill: var(--hh-text-tertiary, #999);
-}
-
-.price-list {
-  margin-top: 8px;
-}
-
-.list-items {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.list-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 8px 12px;
-  border: 1px solid var(--hh-border-light, #e0e0e6);
-  border-radius: 6px;
-  background: var(--hh-bg-secondary, #f5f5f5);
-}
-
-.list-item-left {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-}
-
-.list-item-date {
-  font-size: 13px;
-  color: var(--hh-text-secondary);
-}
-
-.list-item-qty {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--hh-text);
-}
-
-.list-item-note {
-  font-size: 12px;
-  color: var(--hh-text-tertiary);
 }
 </style>

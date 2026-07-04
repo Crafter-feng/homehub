@@ -18,6 +18,7 @@
             <n-tag size="small" round :bordered="false" :type="getCategoryColor(item.type)">
               {{ item.type }}
             </n-tag>
+            <n-tag v-if="item.spec" size="small" round :bordered="false" type="info">{{ item.spec }}</n-tag>
             <n-tag v-if="isExpired" size="small" round :bordered="false" type="error">已过期</n-tag>
             <n-tag v-else-if="isExpiringSoon" size="small" round :bordered="false" type="warning">即将过期</n-tag>
             <n-tag v-if="isLowStock" size="small" round :bordered="false" type="warning">低库存</n-tag>
@@ -70,6 +71,10 @@
               <span class="detail-field-label">品牌</span>
               <span class="detail-field-value">{{ item.brand || '-' }}</span>
             </div>
+            <div class="detail-field" v-if="item.shop">
+              <span class="detail-field-label">商店</span>
+              <span class="detail-field-value">{{ item.shop }}</span>
+            </div>
           </div>
           <div class="detail-section">
             <h3 class="detail-section-title">{{ t('common.notes') }}</h3>
@@ -88,7 +93,7 @@
           <n-button type="success" size="small" @click="openStockIn">{{ t('stock.stockIn') }}</n-button>
           <n-button type="primary" size="small" @click="showConsumeModal = true">{{ t('stock.consume') }}</n-button>
           <n-button size="small" @click="showTransferModal = true">{{ t('stock.transfer') }}</n-button>
-          <n-button type="error" size="small" ghost @click="handleDelete">{{ t('common.delete') }}</n-button>
+          <n-button type="error" size="small" ghost @click="handleDelete(item.id, item.name)">{{ t('common.delete') }}</n-button>
 
           <!-- Plugin slot: ItemType-specific action buttons -->
           <PluginSlot
@@ -101,6 +106,9 @@
           />
         </div>
 
+        <!-- 价格历史 -->
+        <PriceHistoryChart v-if="item" :item-id="item.id" class="section-card" />
+
         <!-- 操作历史 — 时间轴 -->
         <div class="history-section" v-if="history.length > 0">
           <h3 class="detail-section-title">操作历史</h3>
@@ -110,8 +118,10 @@
               <div class="timeline-dot" :style="{ background: getHistoryColor(record.type) }"></div>
               <div class="timeline-content">
                 <div class="timeline-text">
-                  <span class="history-type-label">{{ record.type }}</span>
+                  <span class="history-type-label">{{ translateType(record.type) }}</span>
                   <span class="history-quantity">× {{ record.quantity }}</span>
+                  <span v-if="record.spec" class="history-spec">{{ record.spec }}</span>
+                  <span v-if="record.shop" class="history-shop">@ {{ record.shop }}</span>
                 </div>
                 <div class="timeline-meta">
                   <span v-if="record.source">{{ record.source }}</span>
@@ -158,8 +168,21 @@
     <n-modal v-model:show="showStockInModal" :title="t('stock.stockIn')" preset="card" style="max-width: 420px">
       <div v-if="item" class="stock-in-detail-modal">
         <div class="stock-in-current">当前库存: {{ item.quantity }} {{ item.unit }}</div>
-        <n-form-item :label="t('stock.stockInQuantity')">
+        <n-form-item label="数量">
           <n-input-number v-model:value="stockInQuantity" :min="0.01" :max="9999" style="width: 100%" />
+        </n-form-item>
+        <n-form-item label="单价 (¥)">
+          <n-input-number v-model:value="stockInPrice" :min="0" placeholder="可选" style="width: 100%" />
+        </n-form-item>
+        <n-form-item label="商店">
+          <n-select
+            v-model:value="stockInShop"
+            :options="shopOptions"
+            filterable
+            tag
+            clearable
+            placeholder="购买商店"
+          />
         </n-form-item>
         <n-form-item :label="t('common.notes')">
           <n-input v-model:value="stockInNote" :placeholder="t('stock.stockInNotePlaceholder')" />
@@ -179,169 +202,55 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import {
   NButton, NSpace, NSpin, NModal, NFormItem,
-  NInputNumber, NInput, NSelect, NTag, NIcon, useMessage, useDialog
+  NInputNumber, NInput, NSelect, NTag, NIcon,
 } from 'naive-ui';
-import { stockApi, locationsApi } from '@/api/client';
 import PluginSlot from '@/components/PluginSlot.vue';
+import PriceHistoryChart from '@/components/PriceHistoryChart.vue';
 import { ArrowBackOutline } from '@vicons/ionicons5';
 import { useI18n } from '@/locales';
-import type { Item, StockTransaction, Location } from '@/shared/types';
+import { useStockItem } from '@/composables/useStockItem';
 import { getCategoryColor, getHistoryColor } from '@/utils/format';
 
 const { t } = useI18n();
 const route = useRoute();
 const router = useRouter();
-const message = useMessage();
-const dialog = useDialog();
 
-const item = ref<Item | null>(null);
-const history = ref<StockTransaction[]>([]);
-const locations = ref<Location[]>([]);
-const loading = ref(true);
-
-const showConsumeModal = ref(false);
-const showTransferModal = ref(false);
-const showStockInModal = ref(false);
-const consumeQuantity = ref(1);
-const consumeNote = ref('');
-const stockInQuantity = ref(1);
-const stockInNote = ref('');
-const transferLocation = ref<number | null>(null);
-
-const locationSelectOptions = computed(() =>
-  locations.value.map(l => ({ label: l.name, value: l.id }))
-);
-
-const isExpired = computed(() => {
-  if (!item.value?.expiryDate) return false;
-  return new Date(item.value.expiryDate) < new Date();
+const {
+  item, history, loading,
+  showConsumeModal, showTransferModal, showStockInModal,
+  consumeQuantity, consumeNote,
+  stockInQuantity, stockInPrice, stockInShop, stockInNote,
+  transferLocation, locationSelectOptions,
+  isExpired, isExpiringSoon, isLowStock,
+  getLocationName, formatDate, formatDateTime,
+  loadData, openStockIn, handleStockIn, handleConsume, handleTransfer, handleDelete,
+} = useStockItem({
+  onDeleted: () => router.back(),
 });
 
-const isExpiringSoon = computed(() => {
-  if (!item.value?.expiryDate) return false;
-  const expiry = new Date(item.value.expiryDate);
-  const now = new Date();
-  const diff = expiry.getTime() - now.getTime();
-  return diff > 0 && diff < 7 * 24 * 60 * 60 * 1000; // 7天内
+const typeTranslationMap: Record<string, string> = {
+  'add': '入库',
+  'stock-in': '入库',
+  'consume': '消耗',
+  'transfer': '转移',
+  'adjust': '调整',
+};
+
+const translateType = (type: string): string => typeTranslationMap[type] || type;
+
+// Shop autocomplete from price history (loaded via ItemDetailModal's pattern)
+const shopOptions = computed(() => {
+  if (!item.value?.shop) return [];
+  return [{ label: item.value.shop, value: item.value.shop }];
 });
-
-const isLowStock = computed(() => {
-  if (!item.value) return false;
-  return item.value.minStock !== null && item.value.quantity <= item.value.minStock;
-});
-
-const getLocationName = (locationId: number | null): string => {
-  if (!locationId) return '未指定';
-  const loc = locations.value.find(l => l.id === locationId);
-  return loc ? loc.name : String(locationId);
-};
-
-
-
-const formatDate = (dateStr: string | Date): string => {
-  if (!dateStr) return '-';
-  return new Date(dateStr).toLocaleDateString('zh-CN');
-};
-
-const formatDateTime = (dateStr: string | Date): string => {
-  if (!dateStr) return '-';
-  return new Date(dateStr).toLocaleString('zh-CN');
-};
-
-const loadData = async () => {
-  const id = Number(route.params.id);
-  loading.value = true;
-  try {
-    const [itemRes, historyRes, locRes] = await Promise.all([
-      stockApi.getById(id),
-      stockApi.getHistory(id),
-      locationsApi.list(),
-    ]);
-    item.value = itemRes.data;
-    history.value = historyRes.data || [];
-    locations.value = (locRes.data || []) as Location[];
-  } catch (_e: unknown) {
-    message.error('加载失败');
-  } finally {
-    loading.value = false;
-  }
-};
-
-const handleConsume = async () => {
-  if (!item.value) return;
-  try {
-    await stockApi.consume(item.value.id, { quantity: consumeQuantity.value, note: consumeNote.value });
-    message.success('消耗成功');
-    showConsumeModal.value = false;
-    loadData();
-  } catch (e: unknown) {
-    const err = e as { response?: { data?: { message?: string } } };
-    message.error(err.response?.data?.message || '操作失败');
-  }
-};
-
-const openStockIn = () => {
-  stockInQuantity.value = 1;
-  stockInNote.value = '';
-  showStockInModal.value = true;
-};
-
-const handleStockIn = async () => {
-  if (!item.value) return;
-  try {
-    await stockApi.stockIn(item.value.id, { quantity: stockInQuantity.value, note: stockInNote.value });
-    message.success('入库成功');
-    showStockInModal.value = false;
-    loadData();
-  } catch (e: unknown) {
-    const err = e as { response?: { data?: { message?: string } } };
-    message.error(err.response?.data?.message || '操作失败');
-  }
-};
-
-const handleTransfer = async () => {
-  if (!item.value) return;
-  if (!transferLocation.value) {
-    message.warning('请选择目标位置');
-    return;
-  }
-  try {
-    await stockApi.transfer(item.value.id, { toLocationId: transferLocation.value });
-    message.success('转移成功');
-    showTransferModal.value = false;
-    loadData();
-  } catch (e: unknown) {
-    const err = e as { response?: { data?: { message?: string } } };
-    message.error(err.response?.data?.message || '操作失败');
-  }
-};
-
-const handleDelete = () => {
-  if (!item.value) return;
-  dialog.warning({
-    title: t('stock.confirmDelete'),
-    content: t('stock.confirmDeleteMsg', { name: item.value.name }),
-    positiveText: t('common.delete'),
-    negativeText: t('common.cancel'),
-    onPositiveClick: async () => {
-      try {
-        await stockApi.delete(item.value!.id);
-        message.success('删除成功');
-        router.back();
-      } catch (e: unknown) {
-        const err = e as { response?: { data?: { message?: string } } };
-        message.error(err.response?.data?.message || '删除失败');
-      }
-    },
-  });
-};
 
 onMounted(() => {
-  loadData();
+  const id = Number(route.params.id);
+  loadData(id);
 });
 </script>
 
@@ -474,6 +383,16 @@ onMounted(() => {
   white-space: pre-wrap;
 }
 
+/* === Section Card === */
+.section-card {
+  background: var(--hh-bg-card);
+  border-radius: var(--hh-radius);
+  padding: var(--hh-space-4);
+  border: 1px solid var(--hh-border-light);
+  box-shadow: var(--hh-shadow-sm);
+  margin-bottom: var(--hh-space-5);
+}
+
 /* === Actions === */
 .detail-actions {
   display: flex;
@@ -547,6 +466,19 @@ onMounted(() => {
 
 .history-quantity {
   color: var(--hh-text-secondary);
+}
+
+.history-spec {
+  font-size: var(--hh-text-xs);
+  color: var(--hh-text-tertiary);
+  background: var(--hh-bg-secondary);
+  padding: 0 var(--hh-space-2);
+  border-radius: var(--hh-radius-sm);
+}
+
+.history-shop {
+  font-size: var(--hh-text-xs);
+  color: var(--hh-text-tertiary);
 }
 
 .timeline-meta {

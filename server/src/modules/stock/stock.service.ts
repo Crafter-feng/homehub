@@ -1,6 +1,6 @@
 import { Injectable, Inject, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { eq, and, sql, desc, count, asc } from 'drizzle-orm';
-import { invItems, invItemBatches, invStockTransactions, invProducts, mdUnits, mdLocations } from '../../db/schema';
+import { invItems, invItemBatches, invStockTransactions, invProducts, mdLocations, mdItemTags } from '../../db/schema';
 import { CreateItemDto, UpdateItemDto, ConsumeItemDto, TransferItemDto, AdjustItemDto, StockInItemDto, CreateBatchDto, UpdateBatchDto } from './dto/stock.dto';
 import { DATABASE_TOKEN } from '../../db/database.module';
 import type { Database, TransactionContext } from '../../db/types';
@@ -56,8 +56,10 @@ export class StockService {
     return new PaginationResponse(data as ItemSelect[], total, page, limit);
   }
 
-  async getById(itemId: number): Promise<ItemSelect> {
-    const item = await this.db.select().from(invItems).where(eq(invItems.id, itemId)).get();
+  async getById(itemId: number, familyId: number): Promise<ItemSelect> {
+    const item = await this.db.select().from(invItems)
+      .where(and(eq(invItems.id, itemId), eq(invItems.familyId, familyId)))
+      .get();
     if (!item) throw new NotFoundException('物品不存在');
     return item as ItemSelect;
   }
@@ -75,6 +77,7 @@ export class StockService {
         unit: dto.unit || '个',
         minStock: dto.minStock ?? 0,
         brand: dto.brand,
+        shop: dto.shop,
         notes: dto.notes,
         image: dto.image,
         purchasePrice: dto.purchasePrice,
@@ -165,18 +168,25 @@ export class StockService {
     (updates as Record<string, unknown>).updatedAt = new Date();
 
     await this.db.update(invItems).set(updates as Partial<typeof invItems.$inferInsert>).where(eq(invItems.id, itemId)).run();
-    return this.getById(itemId);
+    return this.getById(itemId, familyId);
   }
 
   async delete(itemId: number, familyId: number) {
-    const item = await this.db.select().from(invItems)
-      .where(and(eq(invItems.id, itemId), eq(invItems.familyId, familyId)))
-      .get();
-    if (!item) throw new NotFoundException('物品不存在');
-    await this.db.delete(invStockTransactions).where(eq(invStockTransactions.itemId, itemId)).run();
-    await this.db.delete(invItems).where(eq(invItems.id, itemId)).run();
-    this.logger.log(`删除物品: ${item.name} (ID: ${itemId})`);
-    return { success: true };
+    return this.db.transaction((tx: TransactionContext) => {
+      const item = tx.select().from(invItems)
+        .where(and(eq(invItems.id, itemId), eq(invItems.familyId, familyId)))
+        .get();
+      if (!item) throw new NotFoundException('物品不存在');
+
+      // Clean up related records: tags, documents, transactions, batches
+      tx.delete(mdItemTags).where(eq(mdItemTags.itemId, itemId)).run();
+      tx.delete(invStockTransactions).where(eq(invStockTransactions.itemId, itemId)).run();
+      tx.delete(invItemBatches).where(eq(invItemBatches.itemId, itemId)).run();
+      tx.delete(invItems).where(eq(invItems.id, itemId)).run();
+
+      this.logger.log(`删除物品: ${item.name} (ID: ${itemId})`);
+      return { success: true };
+    });
   }
 
   async consume(itemId: number, familyId: number, userId: number, dto: ConsumeItemDto): Promise<ItemSelect> {
@@ -330,10 +340,10 @@ export class StockService {
         const currentAvg = item.avgPrice || item.purchasePrice || dto.price;
         const currentMin = item.minPrice || item.purchasePrice || dto.price;
         const currentMax = item.maxPrice || item.purchasePrice || dto.price;
-        const totalQuantity = item.quantity + dto.quantity;
+        const totalQuantity = item.quantity + stockQuantity;
 
         const oldTotalValue = item.quantity * currentAvg;
-        const newTotalValue = dto.quantity * dto.price;
+        const newTotalValue = stockQuantity * dto.price;
         priceUpdates.avgPrice = totalQuantity > 0 ? (oldTotalValue + newTotalValue) / totalQuantity : dto.price;
         priceUpdates.minPrice = Math.min(currentMin, dto.price);
         priceUpdates.maxPrice = Math.max(currentMax, dto.price);
@@ -341,18 +351,20 @@ export class StockService {
 
       tx.update(invItems).set(priceUpdates).where(eq(invItems.id, itemId)).run();
 
+      const resolvedShop = dto.shop ?? item.shop ?? null;
       tx.insert(invStockTransactions).values({
         itemId,
         batchId,
         type: 'add',
-        quantity: dto.quantity,
-        unit: item.unit,
+        quantity: stockQuantity,
+        unit: product?.stockUnit || item.unit,
         toLocationId: dto.locationId || item.locationId,
         userId,
         source: 'manual',
         note: dto.note,
         price: dto.price ?? null,
-        shop: dto.shop ?? null,
+        shop: resolvedShop,
+        spec: product?.spec ?? null,
       }).run();
 
       this.logger.log(`入库物品: ${item.name} (ID: ${itemId}, 入库数量: ${dto.quantity}, 批次: ${batchId})`);
@@ -369,10 +381,11 @@ export class StockService {
 
       const quantity = dto.quantity ?? item.quantity;
 
-      // Check if target location is freezer — extend expiry
+      // Check if target location belongs to family and is freezer — extend expiry
       const targetLoc = tx.select().from(mdLocations)
-        .where(eq(mdLocations.id, dto.toLocationId))
+        .where(and(eq(mdLocations.id, dto.toLocationId), eq(mdLocations.familyId, familyId)))
         .get();
+      if (!targetLoc) throw new NotFoundException('目标位置不存在');
       const updates: Record<string, any> = { locationId: dto.toLocationId, updatedAt: new Date() };
       if (targetLoc?.type === 'freezer' && item.expiryDate) {
         // Extend expiry by 30 days for freezer
@@ -446,7 +459,7 @@ export class StockService {
     const transactions = await this.db.select().from(invStockTransactions)
       .where(and(
         eq(invStockTransactions.itemId, itemId),
-        sql`${invStockTransactions.type} IN ('stock-in', 'add')`,
+        eq(invStockTransactions.type, 'add'),
       ))
       .orderBy(desc(invStockTransactions.createdAt))
       .all();
@@ -457,7 +470,8 @@ export class StockService {
       quantity: t.quantity,
       unit: t.unit,
       note: t.note,
-      store: t.shop || '未知',
+      store: t.shop,
+      spec: t.spec,
     }));
 
     return {
@@ -483,6 +497,9 @@ export class StockService {
   }
 
   async getSummary(familyId: number) {
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    const deadlineSeconds = Math.floor(daysFromNow(7) / 1000);
+
     const totalItems = await this.db.select({ count: sql<number>`count(*)` })
       .from(invItems).where(eq(invItems.familyId, familyId)).get();
 
@@ -490,15 +507,15 @@ export class StockService {
       .from(invItems)
       .where(and(
         eq(invItems.familyId, familyId),
-        sql`${invItems.expiryDate} <= ${daysFromNow(7)}`,
-        sql`${invItems.expiryDate} > ${Date.now()}`,
+        sql`${invItems.expiryDate} <= ${deadlineSeconds}`,
+        sql`${invItems.expiryDate} > ${nowSeconds}`,
       )).get();
 
     const expiredCount = await this.db.select({ count: sql<number>`count(*)` })
       .from(invItems)
       .where(and(
         eq(invItems.familyId, familyId),
-        sql`${invItems.expiryDate} <= ${Date.now()}`,
+        sql`${invItems.expiryDate} <= ${nowSeconds}`,
       )).get();
 
     return {
@@ -565,14 +582,24 @@ export class StockService {
     });
   }
 
-  async listBatches(itemId: number) {
+  async listBatches(itemId: number, familyId: number) {
+    // Verify item belongs to family
+    const item = await this.db.select().from(invItems)
+      .where(and(eq(invItems.id, itemId), eq(invItems.familyId, familyId)))
+      .get();
+    if (!item) throw new NotFoundException('物品不存在');
     return this.db.select().from(invItemBatches)
       .where(eq(invItemBatches.itemId, itemId))
       .orderBy(asc(sql`COALESCE(${invItemBatches.expiryDate}, 9999999999)`))
       .all();
   }
 
-  async getBatchSummary(itemId: number) {
+  async getBatchSummary(itemId: number, familyId: number) {
+    const item = await this.db.select().from(invItems)
+      .where(and(eq(invItems.id, itemId), eq(invItems.familyId, familyId)))
+      .get();
+    if (!item) throw new NotFoundException('物品不存在');
+    const nowSeconds = Math.floor(Date.now() / 1000);
     const batches = await this.db.select().from(invItemBatches)
       .where(and(eq(invItemBatches.itemId, itemId), sql`${invItemBatches.quantity} > 0`))
       .orderBy(asc(sql`COALESCE(${invItemBatches.expiryDate}, 9999999999)`))
@@ -587,128 +614,125 @@ export class StockService {
       purchaseDate: b.purchaseDate,
       locationId: b.locationId,
       createdAt: b.createdAt,
-      isExpired: b.expiryDate ? b.expiryDate.getTime() < Date.now() : false,
+      isExpired: b.expiryDate ? b.expiryDate.getTime() < nowSeconds * 1000 : false,
       daysUntilExpiry: b.expiryDate
-        ? Math.ceil((b.expiryDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+        ? Math.ceil((b.expiryDate.getTime() - nowSeconds * 1000) / (1000 * 60 * 60 * 24))
         : null,
     }));
   }
 
   async editBatch(batchId: number, familyId: number, dto: UpdateBatchDto): Promise<ItemBatchSelect> {
-    const batch = await this.db.select().from(invItemBatches)
-      .where(eq(invItemBatches.id, batchId))
-      .get();
-    if (!batch) throw new NotFoundException('批次不存在');
+    return this.db.transaction((tx: TransactionContext) => {
+      const batch = tx.select().from(invItemBatches)
+        .where(eq(invItemBatches.id, batchId))
+        .get();
+      if (!batch) throw new NotFoundException('批次不存在');
 
-    // Verify the batch belongs to an item in the family
-    const item = await this.db.select().from(invItems)
-      .where(and(eq(invItems.id, batch.itemId), eq(invItems.familyId, familyId)))
-      .get();
-    if (!item) throw new NotFoundException('批次不存在');
+      const item = tx.select().from(invItems)
+        .where(and(eq(invItems.id, batch.itemId), eq(invItems.familyId, familyId)))
+        .get();
+      if (!item) throw new NotFoundException('批次不存在');
 
-    const updates: Record<string, any> = {};
-    if (dto.batchNumber !== undefined) updates.batchNumber = dto.batchNumber;
-    if (dto.quantity !== undefined) {
-      const diff = dto.quantity - batch.quantity;
-      updates.quantity = dto.quantity;
-      // Also update item total quantity
-      await this.db.update(invItems)
-        .set({ quantity: item.quantity + diff, updatedAt: new Date() })
-        .where(eq(invItems.id, batch.itemId))
-        .run();
-    }
-    if (dto.expiryDate !== undefined) {
-      updates.expiryDate = dto.expiryDate ? new Date(dto.expiryDate) : null;
-    }
-    if (dto.purchaseDate !== undefined) {
-      updates.purchaseDate = dto.purchaseDate ? new Date(dto.purchaseDate) : null;
-    }
-    if (dto.locationId !== undefined) {
-      updates.locationId = dto.locationId;
-    }
+      const updates: Record<string, any> = {};
+      if (dto.batchNumber !== undefined) updates.batchNumber = dto.batchNumber;
+      if (dto.quantity !== undefined) {
+        const diff = dto.quantity - batch.quantity;
+        updates.quantity = dto.quantity;
+        tx.update(invItems)
+          .set({ quantity: item.quantity + diff, updatedAt: new Date() })
+          .where(eq(invItems.id, batch.itemId))
+          .run();
+      }
+      if (dto.expiryDate !== undefined) {
+        updates.expiryDate = dto.expiryDate ? new Date(dto.expiryDate) : null;
+      }
+      if (dto.purchaseDate !== undefined) {
+        updates.purchaseDate = dto.purchaseDate ? new Date(dto.purchaseDate) : null;
+      }
+      if (dto.locationId !== undefined) {
+        updates.locationId = dto.locationId;
+      }
 
-    if (Object.keys(updates).length > 0) {
-      await this.db.update(invItemBatches).set(updates).where(eq(invItemBatches.id, batchId)).run();
-    }
+      if (Object.keys(updates).length > 0) {
+        tx.update(invItemBatches).set(updates).where(eq(invItemBatches.id, batchId)).run();
+      }
 
-    return this.db.select().from(invItemBatches).where(eq(invItemBatches.id, batchId)).get() as Promise<ItemBatchSelect>;
+      return tx.select().from(invItemBatches).where(eq(invItemBatches.id, batchId)).get() as ItemBatchSelect;
+    });
   }
 
   async deleteBatch(batchId: number, familyId: number) {
-    const batch = await this.db.select().from(invItemBatches)
-      .where(eq(invItemBatches.id, batchId))
-      .get();
-    if (!batch) throw new NotFoundException('批次不存在');
+    return this.db.transaction((tx: TransactionContext) => {
+      const batch = tx.select().from(invItemBatches)
+        .where(eq(invItemBatches.id, batchId))
+        .get();
+      if (!batch) throw new NotFoundException('批次不存在');
 
-    const item = await this.db.select().from(invItems)
-      .where(and(eq(invItems.id, batch.itemId), eq(invItems.familyId, familyId)))
-      .get();
-    if (!item) throw new NotFoundException('批次不存在');
+      const item = tx.select().from(invItems)
+        .where(and(eq(invItems.id, batch.itemId), eq(invItems.familyId, familyId)))
+        .get();
+      if (!item) throw new NotFoundException('批次不存在');
 
-    // Reduce item quantity by batch quantity
-    const newQty = Math.max(0, item.quantity - batch.quantity);
-    await this.db.update(invItems)
-      .set({ quantity: newQty, updatedAt: new Date() })
-      .where(eq(invItems.id, batch.itemId))
-      .run();
+      const newQty = Math.max(0, item.quantity - batch.quantity);
+      tx.update(invItems)
+        .set({ quantity: newQty, updatedAt: new Date() })
+        .where(eq(invItems.id, batch.itemId))
+        .run();
 
-    await this.db.delete(invItemBatches).where(eq(invItemBatches.id, batchId)).run();
-    return { success: true };
+      tx.delete(invItemBatches).where(eq(invItemBatches.id, batchId)).run();
+      return { success: true };
+    });
   }
 
   /**
    * Compact batches: merge batches with same expiry date and location
    */
   async compactBatches(itemId: number, familyId: number) {
-    // Verify item exists and belongs to family
-    const item = await this.db.select().from(invItems)
-      .where(and(eq(invItems.id, itemId), eq(invItems.familyId, familyId)))
-      .get();
-    if (!item) throw new NotFoundException('物品不存在');
+    return this.db.transaction((tx: TransactionContext) => {
+      const item = tx.select().from(invItems)
+        .where(and(eq(invItems.id, itemId), eq(invItems.familyId, familyId)))
+        .get();
+      if (!item) throw new NotFoundException('物品不存在');
 
-    // Get all batches with quantity > 0
-    const batches = await this.db.select().from(invItemBatches)
-      .where(and(eq(invItemBatches.itemId, itemId), sql`${invItemBatches.quantity} > 0`))
-      .orderBy(invItemBatches.createdAt)
-      .all();
+      const batches = tx.select().from(invItemBatches)
+        .where(and(eq(invItemBatches.itemId, itemId), sql`${invItemBatches.quantity} > 0`))
+        .orderBy(invItemBatches.createdAt)
+        .all();
 
-    // Group by expiryDate + locationId
-    const groups = new Map<string, typeof batches>();
-    for (const batch of batches) {
-      const key = `${batch.expiryDate?.getTime() || 0}_${batch.locationId || 0}`;
-      if (!groups.has(key)) groups.set(key, []);
-      groups.get(key)!.push(batch);
-    }
-
-    let mergedCount = 0;
-    for (const [, groupBatches] of groups) {
-      if (groupBatches.length <= 1) continue;
-
-      // Keep the first batch, merge others into it
-      const primary = groupBatches[0];
-      let totalQty = primary.quantity;
-      const batchIdsToDelete: number[] = [];
-
-      for (let i = 1; i < groupBatches.length; i++) {
-        totalQty += groupBatches[i].quantity;
-        batchIdsToDelete.push(groupBatches[i].id);
+      const groups = new Map<string, typeof batches>();
+      for (const batch of batches) {
+        const key = `${batch.expiryDate?.getTime() || 0}_${batch.locationId || 0}`;
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key)!.push(batch);
       }
 
-      // Update primary batch quantity
-      await this.db.update(invItemBatches)
-        .set({ quantity: totalQty })
-        .where(eq(invItemBatches.id, primary.id))
-        .run();
+      let mergedCount = 0;
+      for (const [, groupBatches] of groups) {
+        if (groupBatches.length <= 1) continue;
 
-      // Delete merged batches
-      for (const id of batchIdsToDelete) {
-        await this.db.delete(invItemBatches).where(eq(invItemBatches.id, id)).run();
+        const primary = groupBatches[0];
+        let totalQty = primary.quantity;
+        const batchIdsToDelete: number[] = [];
+
+        for (let i = 1; i < groupBatches.length; i++) {
+          totalQty += groupBatches[i].quantity;
+          batchIdsToDelete.push(groupBatches[i].id);
+        }
+
+        tx.update(invItemBatches)
+          .set({ quantity: totalQty })
+          .where(eq(invItemBatches.id, primary.id))
+          .run();
+
+        for (const id of batchIdsToDelete) {
+          tx.delete(invItemBatches).where(eq(invItemBatches.id, id)).run();
+        }
+
+        mergedCount += batchIdsToDelete.length;
       }
 
-      mergedCount += batchIdsToDelete.length;
-    }
-
-    return { merged: mergedCount, message: `合并了 ${mergedCount} 个批次` };
+      return { merged: mergedCount, message: `合并了 ${mergedCount} 个批次` };
+    });
   }
 
   /**
@@ -763,28 +787,4 @@ export class StockService {
     return this.registry.getPluginByType<ItemTypePluginExports>('item-type', typeName);
   }
 
-  /**
-   * Convert quantity from one unit to another using mdUnits conversion factors.
-   * Returns the converted quantity and the target unit name.
-   */
-  private convertUnit(quantity: number, fromUnit: string, toUnit: string): { quantity: number; unit: string } {
-    if (fromUnit === toUnit) return { quantity, unit: toUnit };
-
-    // Find the units in mdUnits
-    const fromUnitRow = this.db.select().from(mdUnits)
-      .where(eq(mdUnits.name, fromUnit))
-      .get();
-    const toUnitRow = this.db.select().from(mdUnits)
-      .where(eq(mdUnits.name, toUnit))
-      .get();
-
-    // Both units must have the same parent to be convertible
-    if (fromUnitRow && toUnitRow && fromUnitRow.parentId && fromUnitRow.parentId === toUnitRow.parentId) {
-      const converted = quantity * (fromUnitRow.conversionFactor / toUnitRow.conversionFactor);
-      return { quantity: Math.round(converted * 100) / 100, unit: toUnit };
-    }
-
-    // If same parent group not found, return original
-    return { quantity, unit: fromUnit };
-  }
 }

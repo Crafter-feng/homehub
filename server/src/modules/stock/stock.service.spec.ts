@@ -69,7 +69,7 @@ describe('StockService', () => {
   });
 
   it('should get item by id', async () => {
-    const item = await service.getById(itemId);
+    const item = await service.getById(itemId, 1);
     expect(item.id).toBe(itemId);
     expect(item.name).toBe('测试物品');
   });
@@ -80,8 +80,57 @@ describe('StockService', () => {
     expect(after.quantity).toBeGreaterThan(10);
   });
 
+  it('should stock-in with shop field', async () => {
+    const item = await service.create(1, {
+      name: 'Shop Test Item',
+      type: '测试',
+    }, 1);
+
+    await service.stockIn(item.id, 1, 1, {
+      quantity: 2,
+      price: 15,
+      shop: '超市A',
+    });
+
+    const priceHistory = await service.getPriceHistory(item.id, 1);
+    expect(priceHistory.history.length).toBeGreaterThanOrEqual(1);
+    // The most recent record should have the shop
+    const records = priceHistory.history;
+    const withShop = records.find((r: any) => r.store === '超市A');
+    expect(withShop).toBeDefined();
+    expect(withShop.price).toBe(15);
+  });
+
+  it('should stock-in with shop fallback to item.shop', async () => {
+    const item = await service.create(1, {
+      name: 'Fallback Shop Item',
+      type: '测试',
+      shop: '默认商店',
+    }, 1);
+
+    await service.stockIn(item.id, 1, 1, { quantity: 1, price: 10 });
+    const priceHistory = await service.getPriceHistory(item.id, 1);
+    // Find the stock-in record (not the create record)
+    const stockInRecord = priceHistory.history.find((r: any) => r.price === 10);
+    expect(stockInRecord).toBeDefined();
+    expect(stockInRecord.store).toBe('默认商店');
+  });
+
+  it('should record spec in stock-in transaction', async () => {
+    const item = await service.create(1, {
+      name: 'Spec Item',
+      type: '测试',
+    }, 1);
+
+    await service.stockIn(item.id, 1, 1, { quantity: 3, price: 25 });
+    const priceHistory = await service.getPriceHistory(item.id, 1);
+    const stockInRecord = priceHistory.history.find((r: any) => r.price === 25);
+    expect(stockInRecord).toBeDefined();
+    expect(stockInRecord).toHaveProperty('spec');
+  });
+
   it('should consume reducing quantity', async () => {
-    const before = await service.getById(itemId);
+    const before = await service.getById(itemId, 1);
     const after = await service.consume(itemId, 1, 1, { quantity: 3 });
     expect(after.quantity).toBe(before.quantity - 3);
   });
@@ -111,10 +160,33 @@ describe('StockService', () => {
     expect(types).toContain('adjust');
   });
 
+  it('should get price history with raw store values', async () => {
+    const item = await service.create(1, {
+      name: 'Price History Item',
+      type: '测试',
+    }, 1);
+
+    await service.stockIn(item.id, 1, 1, { quantity: 1, price: 30, shop: '测试商店' });
+
+    const priceHistory = await service.getPriceHistory(item.id, 1);
+    expect(priceHistory).toHaveProperty('currentPrice');
+    expect(priceHistory).toHaveProperty('avgPrice');
+    expect(priceHistory).toHaveProperty('minPrice');
+    expect(priceHistory).toHaveProperty('maxPrice');
+    expect(priceHistory).toHaveProperty('history');
+    expect(Array.isArray(priceHistory.history)).toBe(true);
+
+    for (const entry of priceHistory.history) {
+      expect(entry).toHaveProperty('store');
+      expect(entry).toHaveProperty('spec');
+      expect(typeof entry.store === 'string' || entry.store === null).toBe(true);
+    }
+
+    const withShop = priceHistory.history.find((r: any) => r.store === '测试商店');
+    expect(withShop).toBeDefined();
+  });
+
   it('should find expiring items', async () => {
-    // Read back all items with expiry dates to diagnose
-    const items = await service.list(1, {});
-    const expiryItems = items.data.filter((i: any) => i.expiryDate);
     const created = await service.create(1, { name: '将过期', type: '食品', expiryDate: Date.now() + 2 * 86400000 }, 1);
     const expiring = await service.getExpiring(1, 7);
     expect(expiring.length).toBeGreaterThanOrEqual(1);
@@ -129,7 +201,7 @@ describe('StockService', () => {
   it('should delete an item', async () => {
     const item = await service.create(1, { name: '待删除' }, 1);
     await service.delete(item.id, 1);
-    await expect(service.getById(item.id)).rejects.toThrow('物品不存在');
+    await expect(service.getById(item.id, 1)).rejects.toThrow('物品不存在');
   });
 
   it('should isolate by family', async () => {

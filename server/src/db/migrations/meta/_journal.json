@@ -64,6 +64,20 @@
       "when": 1783260000000,
       "tag": "0015_hardware_devices",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1783300000000,
+      "tag": "0016_transaction_price_shop",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1783400000000,
+      "tag": "0017_product_spec",
+      "breakpoints": true
     }
   ]
 }

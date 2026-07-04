@@ -638,6 +638,12 @@
         <n-form-item label="入库数量">
           <n-input-number v-model:value="inlineStockInQty" :min="0.01" :max="9999" style="width: 100%" />
         </n-form-item>
+        <n-form-item label="单价 (¥)">
+          <n-input-number v-model:value="inlineStockInPrice" :min="0" placeholder="可选" style="width: 100%" />
+        </n-form-item>
+        <n-form-item label="商店">
+          <n-input v-model:value="inlineStockInShop" placeholder="购买商店（可选）" />
+        </n-form-item>
       </div>
       <template #footer>
         <n-space justify="end">
@@ -893,6 +899,8 @@ const inlineActionItem = ref<Item | null>(null);
 const showInlineStockInModal = ref(false);
 const showInlineConsumeModal = ref(false);
 const inlineStockInQty = ref(1);
+const inlineStockInPrice = ref<number | null>(null);
+const inlineStockInShop = ref('');
 const inlineConsumeQty = ref(1);
 const inlineConsumeBatchId = ref<number | null>(null);
 const inlineBatchOptions = ref<Array<{ label: string; value: number; qty: number }>>([]);
@@ -1153,13 +1161,19 @@ function confirmMarkOpened(item: Item) {
 function quickStockInItem(item: Item) {
   inlineActionItem.value = item;
   inlineStockInQty.value = 1;
+  inlineStockInPrice.value = null;
+  inlineStockInShop.value = '';
   showInlineStockInModal.value = true;
 }
 
 async function confirmInlineStockIn() {
   if (!inlineActionItem.value) return;
   try {
-    await stockApi.stockIn(inlineActionItem.value.id, { quantity: inlineStockInQty.value });
+    await stockApi.stockIn(inlineActionItem.value.id, {
+      quantity: inlineStockInQty.value,
+      price: inlineStockInPrice.value ?? undefined,
+      shop: inlineStockInShop.value || undefined,
+    });
     message.success(`入库 ${inlineStockInQty.value} ${inlineActionItem.value.unit}`);
     showInlineStockInModal.value = false;
     stockStore.fetchItems();

@@ -30,6 +30,7 @@ export const invProducts = sqliteTable('inv_products', {
   priceUnit: text('price_unit'),
   purchaseToStockFactor: real('purchase_to_stock_factor').default(1),
   stockToConsumeFactor: real('stock_to_consume_factor').default(1),
+  spec: text('spec'),
   notes: text('notes'),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
@@ -105,6 +106,7 @@ export const invStockTransactions = sqliteTable('inv_stock_transactions', {
   note: text('note'),
   price: real('price'),
   shop: text('shop'),
+  spec: text('spec'),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
 });
 
