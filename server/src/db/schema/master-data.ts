@@ -12,6 +12,7 @@ export const mdLocations = sqliteTable('md_locations', {
   name: text('name').notNull(),
   parentId: integer('parent_id'),
   level: integer('level').notNull().default(1),
+  type: text('type').default('normal'),
   image: text('image'),
   notes: text('notes'),
   sortOrder: integer('sort_order').notNull().default(0),

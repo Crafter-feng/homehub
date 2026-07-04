@@ -84,6 +84,14 @@ export class CreateItemDto {
   @IsOptional()
   productId?: number;
 
+  @IsNumber()
+  @IsOptional()
+  caloriesPerUnit?: number;
+
+  @IsNumber()
+  @IsOptional()
+  tareWeight?: number;
+
   @IsOptional()
   customFields?: Record<string, unknown>;
 }

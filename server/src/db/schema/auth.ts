@@ -11,6 +11,7 @@ export const users = sqliteTable('users', {
   name: text('name').notNull(),
   passwordHash: text('password_hash').notNull(),
   avatar: text('avatar'),
+  role: text('role').default('editor'),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
 });

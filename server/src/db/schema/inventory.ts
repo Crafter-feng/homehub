@@ -20,6 +20,9 @@ export const invProducts = sqliteTable('inv_products', {
   defaultPrice: real('default_price'),
   defaultBestBeforeDays: integer('default_best_before_days'),
   defaultBestBeforeDaysAfterOpen: integer('default_best_before_days_after_open'),
+  moveOnOpenLocationId: integer('move_on_open_location_id'),
+  parentId: integer('parent_id'),
+  caloriesPerUnit: real('calories_per_unit'),
   notes: text('notes'),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
@@ -57,6 +60,8 @@ export const invItems = sqliteTable('inv_items', {
   lastUsedAt: integer('last_used_at', { mode: 'timestamp' }),
   spoilRate: real('spoil_rate'),
   avgShelfLife: real('avg_shelf_life'),
+  tareWeight: real('tare_weight'),
+  caloriesPerUnit: real('calories_per_unit'),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
 });
@@ -90,6 +95,16 @@ export const invStockTransactions = sqliteTable('inv_stock_transactions', {
     enum: ['manual', 'barcode', 'nfc', 'rfid', 'voice', 'vision', 'mcp'],
   }).notNull().default('manual'),
   note: text('note'),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
+});
+
+// ── 产品条码（多对一） ──
+export const invProductBarcodes = sqliteTable('inv_product_barcodes', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  productId: integer('product_id').notNull().references(() => invProducts.id, { onDelete: 'cascade' }),
+  barcode: text('barcode').notNull(),
+  isPrimary: integer('is_primary').default(0),
+  notes: text('notes'),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
 });
 

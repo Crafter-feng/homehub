@@ -413,6 +413,15 @@ export const budgetApi = {
   getMonthlyCost: () => api.get('/budget/subscriptions/monthly-cost'),
 };
 
+// === Documents API ===
+export const documentsApi = {
+  list: (itemId?: number) => api.get('/documents', { params: { itemId } }),
+  getById: (id: number) => api.get(`/documents/${id}`),
+  upload: (formData: FormData) => api.post('/documents/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  download: (id: number) => api.get(`/documents/${id}/download`, { responseType: 'blob' }),
+  delete: (id: number) => api.delete(`/documents/${id}`),
+};
+
 // === Backup API ===
 export const backupApi = {
   list: () => api.get('/backup'),

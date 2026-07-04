@@ -125,6 +125,11 @@ export class StockController {
     return this.stockService.deleteBatch(parseInt(batchId), req.user.familyId);
   }
 
+  @Post('items/:id/batches/compact')
+  compactBatches(@Param('id') id: string, @Request() req: AuthedRequest) {
+    return this.stockService.compactBatches(parseInt(id), req.user.familyId);
+  }
+
   @Get('export')
   async exportCsv(@Request() req: AuthedRequest, @Res() res: Response) {
     // list now returns PaginationResponse, extract data array for CSV export

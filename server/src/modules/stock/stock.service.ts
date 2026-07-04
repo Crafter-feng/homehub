@@ -1,6 +1,6 @@
 import { Injectable, Inject, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { eq, and, sql, desc, count, asc } from 'drizzle-orm';
-import { invItems, invItemBatches, invStockTransactions, invProducts, mdUnits } from '../../db/schema';
+import { invItems, invItemBatches, invStockTransactions, invProducts, mdUnits, mdLocations } from '../../db/schema';
 import { CreateItemDto, UpdateItemDto, ConsumeItemDto, TransferItemDto, AdjustItemDto, StockInItemDto, CreateBatchDto, UpdateBatchDto } from './dto/stock.dto';
 import { DATABASE_TOKEN } from '../../db/database.module';
 import type { Database, TransactionContext } from '../../db/types';
@@ -134,7 +134,7 @@ export class StockService {
       (updates as Record<string, unknown>).expiryDate = dto.expiryDate ? new Date(dto.expiryDate) : null;
     }
 
-    // Handle "opened" state change — auto-adjust expiry date from product defaults
+    // Handle "opened" state change — auto-adjust expiry + auto-transfer
     if (dto.currentState === 'opened' && item.currentState !== 'opened') {
       (updates as Record<string, unknown>).currentState = 'opened';
       (updates as Record<string, unknown>).stateChangedAt = new Date();
@@ -148,6 +148,11 @@ export class StockService {
           const newExpiry = new Date(Date.now() + product.defaultBestBeforeDaysAfterOpen * 86400000);
           (updates as Record<string, unknown>).expiryDate = newExpiry;
           this.logger.log(`自动调整到期日: ${item.name} → ${newExpiry.toISOString()}`);
+        }
+        // Auto-transfer to moveOnOpenLocationId
+        if (product?.moveOnOpenLocationId && product.moveOnOpenLocationId !== item.locationId) {
+          (updates as Record<string, unknown>).locationId = product.moveOnOpenLocationId;
+          this.logger.log(`自动转移: ${item.name} → 位置 ${product.moveOnOpenLocationId}`);
         }
       }
     } else if (dto.currentState !== undefined) {
@@ -347,10 +352,20 @@ export class StockService {
       if (!item) throw new NotFoundException('物品不存在');
 
       const quantity = dto.quantity ?? item.quantity;
-      tx.update(invItems)
-        .set({ locationId: dto.toLocationId, updatedAt: new Date() })
-        .where(eq(invItems.id, itemId))
-        .run();
+
+      // Check if target location is freezer — extend expiry
+      const targetLoc = tx.select().from(mdLocations)
+        .where(eq(mdLocations.id, dto.toLocationId))
+        .get();
+      const updates: Record<string, any> = { locationId: dto.toLocationId, updatedAt: new Date() };
+      if (targetLoc?.type === 'freezer' && item.expiryDate) {
+        // Extend expiry by 30 days for freezer
+        const extended = new Date(item.expiryDate.getTime() + 30 * 86400000);
+        updates.expiryDate = extended;
+        this.logger.log(`冷冻转移: ${item.name} 到期日延长至 ${extended.toISOString()}`);
+      }
+
+      tx.update(invItems).set(updates).where(eq(invItems.id, itemId)).run();
 
       tx.insert(invStockTransactions).values({
         itemId,
@@ -586,6 +601,107 @@ export class StockService {
 
     await this.db.delete(invItemBatches).where(eq(invItemBatches.id, batchId)).run();
     return { success: true };
+  }
+
+  /**
+   * Compact batches: merge batches with same expiry date and location
+   */
+  async compactBatches(itemId: number, familyId: number) {
+    // Verify item exists and belongs to family
+    const item = await this.db.select().from(invItems)
+      .where(and(eq(invItems.id, itemId), eq(invItems.familyId, familyId)))
+      .get();
+    if (!item) throw new NotFoundException('物品不存在');
+
+    // Get all batches with quantity > 0
+    const batches = await this.db.select().from(invItemBatches)
+      .where(and(eq(invItemBatches.itemId, itemId), sql`${invItemBatches.quantity} > 0`))
+      .orderBy(invItemBatches.createdAt)
+      .all();
+
+    // Group by expiryDate + locationId
+    const groups = new Map<string, typeof batches>();
+    for (const batch of batches) {
+      const key = `${batch.expiryDate?.getTime() || 0}_${batch.locationId || 0}`;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(batch);
+    }
+
+    let mergedCount = 0;
+    for (const [, groupBatches] of groups) {
+      if (groupBatches.length <= 1) continue;
+
+      // Keep the first batch, merge others into it
+      const primary = groupBatches[0];
+      let totalQty = primary.quantity;
+      const batchIdsToDelete: number[] = [];
+
+      for (let i = 1; i < groupBatches.length; i++) {
+        totalQty += groupBatches[i].quantity;
+        batchIdsToDelete.push(groupBatches[i].id);
+      }
+
+      // Update primary batch quantity
+      await this.db.update(invItemBatches)
+        .set({ quantity: totalQty })
+        .where(eq(invItemBatches.id, primary.id))
+        .run();
+
+      // Delete merged batches
+      for (const id of batchIdsToDelete) {
+        await this.db.delete(invItemBatches).where(eq(invItemBatches.id, id)).run();
+      }
+
+      mergedCount += batchIdsToDelete.length;
+    }
+
+    return { merged: mergedCount, message: `合并了 ${mergedCount} 个批次` };
+  }
+
+  /**
+   * Get child products of a parent product
+   */
+  async getChildProducts(productId: number) {
+    return this.db.select().from(invProducts)
+      .where(eq(invProducts.parentId, productId))
+      .all();
+  }
+
+  /**
+   * Get aggregated stock for a parent product (including children)
+   */
+  async getAggregatedStock(productId: number, familyId: number) {
+    const parent = await this.db.select().from(invProducts)
+      .where(eq(invProducts.id, productId))
+      .get();
+    if (!parent) return null;
+
+    const children = await this.getChildProducts(productId);
+    const childIds = children.map((c: any) => c.id);
+
+    // Get stock for parent item
+    const parentItem = await this.db.select().from(invItems)
+      .where(and(eq(invItems.productId, productId), eq(invItems.familyId, familyId)))
+      .get();
+
+    // Get stock for child items
+    let childTotalQty = 0;
+    for (const childId of childIds) {
+      const childItem = await this.db.select().from(invItems)
+        .where(and(eq(invItems.productId, childId), eq(invItems.familyId, familyId)))
+        .get();
+      if (childItem) childTotalQty += childItem.quantity;
+    }
+
+    return {
+      productId,
+      name: parent.name,
+      unit: parent.unit,
+      parentQuantity: parentItem?.quantity || 0,
+      childQuantity: childTotalQty,
+      totalQuantity: (parentItem?.quantity || 0) + childTotalQty,
+      childCount: children.length,
+    };
   }
 
   // === ItemType Plugin Integration ===

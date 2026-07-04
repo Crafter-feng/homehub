@@ -1,7 +1,7 @@
 import { Injectable, Inject } from '@nestjs/common';
 import { DATABASE_TOKEN } from '../../db/database.module';
 import { eq, and, desc, sql, like, gte, lte } from 'drizzle-orm';
-import { invStockTransactions, invItems, hhLists, hhListItems, sysAutomationTriggers, mdCategories, mdLocations } from '../../db/schema';
+import { invStockTransactions, invItems, hhLists, hhListItems, sysAutomationTriggers, mdCategories, mdLocations, users } from '../../db/schema';
 
 @Injectable()
 export class DashboardService {
@@ -20,10 +20,13 @@ export class DashboardService {
       unit: invStockTransactions.unit,
       note: invStockTransactions.note,
       source: invStockTransactions.source,
+      userId: invStockTransactions.userId,
       createdAt: invStockTransactions.createdAt,
       itemName: invItems.name,
+      userName: users.name,
     }).from(invStockTransactions)
       .innerJoin(invItems, eq(invStockTransactions.itemId, invItems.id))
+      .leftJoin(users, eq(invStockTransactions.userId, users.id))
       .where(eq(invItems.familyId, familyId))
       .orderBy(desc(invStockTransactions.createdAt))
       .limit(limit);
@@ -36,6 +39,8 @@ export class DashboardService {
         detail: `${tx.itemName} ${tx.type === 'add' ? '+' : tx.type === 'consume' ? '-' : ''}${tx.quantity}${tx.unit}`,
         note: tx.note,
         source: tx.source,
+        userId: tx.userId,
+        userName: tx.userName,
         createdAt: tx.createdAt,
       });
     }

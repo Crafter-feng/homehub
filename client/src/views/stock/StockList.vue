@@ -266,6 +266,7 @@
                 <n-card class="stock-card" :class="getRowClass(item)" @click="auditActive ? null : openItemDetail(item.id)">
                   <template #header>
                     <div class="stock-card-header">
+                      <img v-if="item.image" :src="item.image" class="stock-card-thumb" />
                       <span class="stock-card-name">{{ item.name }}</span>
                       <n-tag v-if="isExpired(item)" size="small" type="error" :bordered="false">{{ t('stock.expired') }}</n-tag>
                       <n-tag v-else-if="isLowStock(item)" size="small" type="warning" :bordered="false">{{ t('stock.lowStockLabel') }}</n-tag>
@@ -587,10 +588,8 @@
               <n-input-number v-model:value="quickStockInQuantity" :min="0.01" :max="99999" size="large" style="width: 100%" />
             </div>
             <div class="qs-form-row">
-              <label class="qs-label">单价 (¥)</label>
-              <n-input-number v-model:value="quickStockInPrice" :min="0" :precision="2" placeholder="0.00" size="large" style="width: 100%">
-                <template #prefix>¥</template>
-              </n-input-number>
+              <label class="qs-label">单位</label>
+              <n-select v-model:value="quickStockInUnit" :options="unitOptions" placeholder="选择单位" size="large" />
             </div>
           </div>
           <div class="qs-form-grid">
@@ -750,6 +749,7 @@ interface ColumnConfig {
 
 const columnConfigs: ColumnConfig[] = [
   { key: 'name', label: '名称', defaultVisible: true },
+  { key: 'image', label: '图片', defaultVisible: false },
   { key: 'quantity', label: '数量', defaultVisible: true },
   { key: 'type', label: '类别', defaultVisible: true, allowGrouping: true },
   { key: 'locationId', label: '位置', defaultVisible: true, allowGrouping: true },
@@ -925,6 +925,7 @@ const quickStockInNote = ref('');
 const quickStockInConfirming = ref(false);
 const quickStockInBatchNumber = ref('');
 const quickStockInExpiryDate = ref<number | null>(null);
+const quickStockInUnit = ref<string>('');
 const locations = ref<Location[]>([]);
 
 // ── Data ──
@@ -955,6 +956,10 @@ const categoryOptions = computed(() =>
 
 const locationOptions = computed(() =>
   locations.value.map(l => ({ label: l.name, value: l.id }))
+);
+
+const unitOptions = computed(() =>
+  units.value.map(u => ({ label: u.name, value: u.name }))
 );
 
 const importExportOptions = [
@@ -1233,6 +1238,23 @@ function buildNormalTableColumns(): DataTableColumns<any> {
       }, row.name);
     },
   });
+
+  // 图片列
+  if (visibleColumns.value.has('image')) {
+    cols.push({
+      title: '图片',
+      key: 'image',
+      width: 60,
+      render: (row) => skipGroupHeader(row, () => {
+        if (!row.image) return h('span', { style: 'color: var(--hh-text-tertiary)' }, '-');
+        return h('img', {
+          src: row.image,
+          style: 'width: 36px; height: 36px; object-fit: cover; border-radius: 6px; border: 1px solid var(--hh-border-light);',
+          onError: (e: Event) => { (e.target as HTMLImageElement).style.display = 'none'; },
+        });
+      }),
+    });
+  }
 
   // 数量列（含已开标记 — 优化8）
   if (visibleColumns.value.has('quantity')) {
@@ -1536,6 +1558,7 @@ function openQuickStockIn() {
   quickStockInNote.value = '';
   quickStockInBatchNumber.value = '';
   quickStockInExpiryDate.value = null;
+  quickStockInUnit.value = '';
   showQuickStockInModal.value = true;
 }
 
@@ -1900,7 +1923,8 @@ onMounted(async () => {
 .stock-card.row-expired { border-color: #fecaca; }
 .stock-card.row-expiring { border-color: #fde68a; }
 .stock-card.row-low-stock { border-color: #bfdbfe; }
-.stock-card-header { display: flex; justify-content: space-between; align-items: center; gap: var(--hh-space-2); }
+.stock-card-header { display: flex; align-items: center; gap: 8px; }
+.stock-card-thumb { width: 32px; height: 32px; object-fit: cover; border-radius: 6px; border: 1px solid var(--hh-border-light); flex-shrink: 0; }
 .stock-card-name { font-weight: 600; font-size: 15px; }
 .stock-card-meta { display: flex; align-items: center; justify-content: space-between; gap: var(--hh-space-2); margin-top: var(--hh-space-2); }
 .stock-card-quantity { font-size: var(--hh-text-sm); color: var(--hh-text-secondary); font-weight: var(--hh-weight-medium); }
