@@ -152,7 +152,7 @@ export const stockApi = {
   delete: (id: number) => api.delete(`/stock/items/${id}`),
   consume: (id: number, data: { quantity: number; note?: string; batchId?: number; spoiled?: number }) =>
     api.post(`/stock/items/${id}/consume`, data),
-  stockIn: (id: number, data: { quantity: number; note?: string; price?: number; batchNumber?: string; expiryDate?: number; purchaseDate?: number; locationId?: number }) =>
+  stockIn: (id: number, data: { quantity: number; note?: string; price?: number; shop?: string; batchNumber?: string; expiryDate?: number; purchaseDate?: number; locationId?: number }) =>
     api.post(`/stock/items/${id}/stock-in`, data),
   transfer: (id: number, data: { toLocationId: number; quantity?: number }) =>
     api.post(`/stock/items/${id}/transfer`, data),

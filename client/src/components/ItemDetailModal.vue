@@ -107,25 +107,20 @@
                 </div>
                 <div class="chart-container">
                   <svg :viewBox="`0 0 ${chartWidth} ${chartHeight}`" class="line-chart">
-                    <!-- Y轴标签 -->
                     <text v-for="(tick, idx) in yTicks" :key="'y'+idx"
-                      :x="chartPadding.left - 8" :y="tick.y + 4"
+                      :x="chartPadding.left - 6" :y="tick.y + 3"
                       text-anchor="end" class="axis-label">¥{{ tick.value }}</text>
-                    <!-- X轴标签 -->
                     <text v-for="(tick, idx) in xTicks" :key="'x'+idx"
-                      :x="tick.x" :y="chartHeight - 5"
+                      :x="tick.x" :y="chartHeight - 4"
                       text-anchor="middle" class="axis-label">{{ tick.label }}</text>
-                    <!-- 网格线 -->
                     <line v-for="(tick, idx) in yTicks" :key="'gy'+idx"
                       :x1="chartPadding.left" :y1="tick.y" :x2="chartWidth - chartPadding.right" :y2="tick.y"
-                      stroke="#e0e0e6" stroke-width="1" stroke-dasharray="4,4" />
-                    <!-- 折线 -->
+                      stroke="#e0e0e6" stroke-width="0.5" stroke-dasharray="3,3" />
                     <polyline v-for="(line, idx) in chartLines" :key="'line'+idx"
                       :points="line.points"
-                      fill="none" :stroke="line.color" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                    <!-- 数据点 -->
+                      fill="none" :stroke="line.color" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
                     <circle v-for="(point, idx) in chartPoints" :key="'pt'+idx"
-                      :cx="point.x" :cy="point.y" r="4" :fill="point.color" stroke="white" stroke-width="2" />
+                      :cx="point.x" :cy="point.y" r="3" :fill="point.color" stroke="white" stroke-width="1.5" />
                   </svg>
                 </div>
               </div>
@@ -237,6 +232,14 @@
         <n-form-item label="入库数量">
           <n-input-number v-model:value="stockInQuantity" :min="0.01" :max="9999" style="width: 100%" />
         </n-form-item>
+        <n-form-item label="本次价格">
+          <n-input-number v-model:value="stockInPrice" :min="0" :precision="2" placeholder="可选" style="width: 100%">
+            <template #prefix>¥</template>
+          </n-input-number>
+        </n-form-item>
+        <n-form-item label="商店">
+          <n-input v-model:value="stockInShop" placeholder="可选" />
+        </n-form-item>
         <n-form-item label="备注">
           <n-input v-model:value="stockInNote" placeholder="备注（可选）" />
         </n-form-item>
@@ -289,6 +292,8 @@ const showStockInModal = ref(false);
 const consumeQuantity = ref(1);
 const consumeNote = ref('');
 const stockInQuantity = ref(1);
+const stockInPrice = ref<number | null>(null);
+const stockInShop = ref('');
 const stockInNote = ref('');
 const transferLocation = ref<number | null>(null);
 
@@ -380,6 +385,8 @@ const handleConsume = async () => {
 
 const openStockIn = () => {
   stockInQuantity.value = 1;
+  stockInPrice.value = null;
+  stockInShop.value = '';
   stockInNote.value = '';
   showStockInModal.value = true;
 };
@@ -387,7 +394,12 @@ const openStockIn = () => {
 const handleStockIn = async () => {
   if (!item.value) return;
   try {
-    await stockApi.stockIn(item.value.id, { quantity: stockInQuantity.value, note: stockInNote.value });
+    await stockApi.stockIn(item.value.id, {
+      quantity: stockInQuantity.value,
+      note: stockInNote.value,
+      price: stockInPrice.value ?? undefined,
+      shop: stockInShop.value || undefined,
+    });
     message.success('入库成功');
     showStockInModal.value = false;
     loadData();
@@ -445,9 +457,9 @@ const formatDateShort = (dateStr: string | Date): string => {
 };
 
 // Chart constants
-const chartWidth = 400;
-const chartHeight = 200;
-const chartPadding = { top: 20, right: 20, bottom: 30, left: 50 };
+const chartWidth = 320;
+const chartHeight = 150;
+const chartPadding = { top: 12, right: 12, bottom: 24, left: 40 };
 
 // Store colors (similar to Grocy's color scheme)
 const storeColorPalette = [
@@ -487,7 +499,8 @@ const translateType = (type: string): string => {
 
 const priceRange = computed(() => {
   if (!priceHistory.value?.history?.length) return { min: 0, max: 100 };
-  const prices = priceHistory.value.history.map((r: any) => r.quantity);
+  const prices = priceHistory.value.history.map((r: any) => r.price).filter((p: any) => p != null);
+  if (prices.length === 0) return { min: 0, max: 100 };
   const min = Math.min(...prices);
   const max = Math.max(...prices);
   const padding = (max - min) * 0.1 || 10;
@@ -501,14 +514,15 @@ const yTicks = computed(() => {
   for (let i = 0; i <= steps; i++) {
     const value = min + (max - min) * (i / steps);
     const y = chartPadding.top + (chartHeight - chartPadding.top - chartPadding.bottom) * (1 - i / steps);
-    ticks.push({ value: Math.round(value), y });
+    ticks.push({ value: value.toFixed(value >= 10 ? 0 : 1), y });
   }
   return ticks;
 });
 
 const xTicks = computed(() => {
   if (!priceHistory.value?.history?.length) return [];
-  const history = priceHistory.value.history;
+  const history = [...priceHistory.value.history].reverse().filter((r: any) => r.price != null);
+  if (history.length === 0) return [];
   const ticks = [];
   const maxTicks = Math.min(history.length, 5);
   for (let i = 0; i < maxTicks; i++) {
@@ -521,12 +535,12 @@ const xTicks = computed(() => {
 
 const chartLines = computed(() => {
   if (!priceHistory.value?.history?.length) return [];
-  const history = [...priceHistory.value.history].reverse(); // chronological order
+  const history = [...priceHistory.value.history].reverse();
   const { min, max } = priceRange.value;
 
-  // Group by store
   const storeData = new Map<string, Array<any>>();
   history.forEach((r: any) => {
+    if (r.price == null) return;
     if (!storeData.has(r.store)) storeData.set(r.store, []);
     storeData.get(r.store)!.push(r);
   });
@@ -534,11 +548,13 @@ const chartLines = computed(() => {
   const lines: Array<{ points: string; color: string }> = [];
   storeColors.value.forEach(({ name, color }) => {
     const data = storeData.get(name) || [];
-    if (data.length < 2) return; // Need at least 2 points for a line
+    if (data.length < 2) return;
 
-    const points = data.map((r: any, idx: number) => {
-      const x = chartPadding.left + (chartWidth - chartPadding.left - chartPadding.right) * idx / Math.max(history.length - 1, 1);
-      const y = chartPadding.top + (chartHeight - chartPadding.top - chartPadding.bottom) * (1 - (r.quantity - min) / (max - min));
+    const allWithPrice = history.filter((r: any) => r.price != null);
+    const points = data.map((r: any) => {
+      const idx = allWithPrice.indexOf(r);
+      const x = chartPadding.left + (chartWidth - chartPadding.left - chartPadding.right) * idx / Math.max(allWithPrice.length - 1, 1);
+      const y = chartPadding.top + (chartHeight - chartPadding.top - chartPadding.bottom) * (1 - (r.price - min) / (max - min));
       return `${x},${y}`;
     }).join(' ');
 
@@ -552,13 +568,14 @@ const chartPoints = computed(() => {
   if (!priceHistory.value?.history?.length) return [];
   const history = [...priceHistory.value.history].reverse();
   const { min, max } = priceRange.value;
+  const allWithPrice = history.filter((r: any) => r.price != null);
 
   const storeColorMap = new Map(storeColors.value.map(s => [s.name, s.color]));
   const points: Array<{ x: number; y: number; color: string }> = [];
 
-  history.forEach((r: any, idx: number) => {
-    const x = chartPadding.left + (chartWidth - chartPadding.left - chartPadding.right) * idx / Math.max(history.length - 1, 1);
-    const y = chartPadding.top + (chartHeight - chartPadding.top - chartPadding.bottom) * (1 - (r.quantity - min) / (max - min));
+  allWithPrice.forEach((r: any, idx: number) => {
+    const x = chartPadding.left + (chartWidth - chartPadding.left - chartPadding.right) * idx / Math.max(allWithPrice.length - 1, 1);
+    const y = chartPadding.top + (chartHeight - chartPadding.top - chartPadding.bottom) * (1 - (r.price - min) / (max - min));
     points.push({ x, y, color: storeColorMap.get(r.store) || '#909399' });
   });
 
@@ -950,7 +967,7 @@ const handleDelete = () => {
 }
 
 .chart-container {
-  padding: 8px;
+  padding: 4px;
   background: var(--hh-bg-secondary, #f5f5f5);
   border-radius: 8px;
   overflow: hidden;
@@ -959,10 +976,11 @@ const handleDelete = () => {
 .line-chart {
   width: 100%;
   height: auto;
+  display: block;
 }
 
 .axis-label {
-  font-size: 10px;
+  font-size: 9px;
   fill: var(--hh-text-tertiary, #999);
 }
 

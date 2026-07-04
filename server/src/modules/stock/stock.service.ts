@@ -111,6 +111,8 @@ export class StockService {
         toLocationId: dto.locationId,
         userId,
         source: 'manual',
+        price: dto.purchasePrice ?? null,
+        shop: dto.shop ?? null,
       }).run();
 
       this.logger.log(`创建物品: ${dto.name} (ID: ${itemId}, 家庭: ${familyId})`);
@@ -349,6 +351,8 @@ export class StockService {
         userId,
         source: 'manual',
         note: dto.note,
+        price: dto.price ?? null,
+        shop: dto.shop ?? null,
       }).run();
 
       this.logger.log(`入库物品: ${item.name} (ID: ${itemId}, 入库数量: ${dto.quantity}, 批次: ${batchId})`);
@@ -434,13 +438,11 @@ export class StockService {
   }
 
   async getPriceHistory(itemId: number, familyId: number) {
-    // Verify item belongs to family
     const item = await this.db.select().from(invItems)
       .where(and(eq(invItems.id, itemId), eq(invItems.familyId, familyId)))
       .get();
     if (!item) throw new NotFoundException('物品不存在');
 
-    // Get all stock transactions with prices
     const transactions = await this.db.select().from(invStockTransactions)
       .where(and(
         eq(invStockTransactions.itemId, itemId),
@@ -449,36 +451,15 @@ export class StockService {
       .orderBy(desc(invStockTransactions.createdAt))
       .all();
 
-    // Get shops for store names
-    const { mdShops } = await import('../../db/schema');
+    const history = transactions.map((t: typeof transactions[number]) => ({
+      date: t.createdAt,
+      price: t.price,
+      quantity: t.quantity,
+      unit: t.unit,
+      note: t.note,
+      store: t.shop || '未知',
+    }));
 
-    // Build price history with store info
-    const history = [];
-    for (const t of transactions) {
-      let storeName = null;
-      // Check batch for location info
-      if (t.batchId) {
-        const { invItemBatches } = await import('../../db/schema');
-        const batch = await this.db.select().from(invItemBatches)
-          .where(eq(invItemBatches.id, t.batchId))
-          .get();
-        if (batch?.locationId) {
-          const loc = await this.db.select().from((await import('../../db/schema')).mdLocations)
-            .where(eq((await import('../../db/schema')).mdLocations.id, batch.locationId))
-            .get();
-          storeName = loc?.name;
-        }
-      }
-      history.push({
-        date: t.createdAt,
-        quantity: t.quantity,
-        unit: t.unit,
-        note: t.note,
-        store: storeName || '未知',
-      });
-    }
-
-    // Get current item price stats
     return {
       currentPrice: item.purchasePrice,
       avgPrice: item.avgPrice,
