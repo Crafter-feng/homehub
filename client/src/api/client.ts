@@ -49,7 +49,14 @@ function onRefreshFailed(error: unknown) {
 }
 
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // Unwrap TransformInterceptor response: {code, data, message} → data
+    const responseData = response.data;
+    if (responseData && typeof responseData === 'object' && 'code' in responseData && 'data' in responseData) {
+      response.data = responseData.data;
+    }
+    return response;
+  },
   async (error) => {
     const originalRequest = error.config;
 
@@ -82,10 +89,12 @@ api.interceptors.response.use(
     originalRequest._retry = true;
 
     try {
-      const { data } = await axios.post('/api/v1/auth/refresh', { refreshToken });
+      const { data: rawRefreshData } = await axios.post('/api/v1/auth/refresh', { refreshToken });
 
-      const newAccessToken: string = data.accessToken || data.data?.accessToken;
-      const newRefreshToken: string = data.refreshToken || data.data?.refreshToken;
+      // Unwrap TransformInterceptor response if wrapped
+      const refreshData = rawRefreshData?.data || rawRefreshData;
+      const newAccessToken: string = refreshData.accessToken;
+      const newRefreshToken: string = refreshData.refreshToken;
 
       TokenStorage.setAccessToken(newAccessToken);
       if (newRefreshToken) {
@@ -158,6 +167,7 @@ export const stockApi = {
   updateBatch: (batchId: number, data: { batchNumber?: string; quantity?: number; expiryDate?: number; purchaseDate?: number; locationId?: number }) =>
     api.put(`/stock/items/batches/${batchId}`, data),
   deleteBatch: (batchId: number) => api.delete(`/stock/items/batches/${batchId}`),
+  compactBatches: (itemId: number) => api.post(`/stock/items/${itemId}/batches/compact`),
   // CSV
   exportCsv: () => api.get('/stock/export', { responseType: 'blob' }),
   importCsv: (data: { invItems: Array<Partial<Item>> }) => api.post('/stock/import', data),
@@ -252,6 +262,7 @@ export const recipesApi = {
   delete: (id: number) => api.delete(`/recipes/${id}`),
   getRecommendations: (limit?: number) =>
     api.get('/recipes/recommendations', { params: { limit } }),
+  getDueScore: (id: number) => api.get(`/recipes/${id}/due-score`),
 };
 
 // === Trigger API ===

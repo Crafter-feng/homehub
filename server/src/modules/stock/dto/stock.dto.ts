@@ -202,6 +202,10 @@ export class ConsumeItemDto {
   @Min(0)
   @IsOptional()
   spoiled?: number;
+
+  @IsNumber()
+  @IsOptional()
+  recipeId?: number;
 }
 
 export class UpdateBatchDto {

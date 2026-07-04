@@ -245,6 +245,7 @@ export class StockService {
         tx.insert(invStockTransactions).values({
           itemId,
           batchId: cb.batchId,
+          recipeId: dto.recipeId || null,
           type: 'consume',
           quantity: cb.quantity,
           unit: item.unit,
@@ -280,26 +281,37 @@ export class StockService {
         .get();
       if (!item) throw new NotFoundException('物品不存在');
 
-      // Auto-calculate expiry date from product defaults if not provided
-      let expiryDate = dto.expiryDate ? new Date(dto.expiryDate) : null;
-      if (!expiryDate && item.productId) {
-        const product = tx.select().from(invProducts)
+      // Get product for unit conversion and expiry calculation
+      let product: any = null;
+      if (item.productId) {
+        product = tx.select().from(invProducts)
           .where(eq(invProducts.id, item.productId))
           .get();
-        if (product?.defaultBestBeforeDays) {
-          const purchaseDate = dto.purchaseDate ? new Date(dto.purchaseDate) : new Date();
-          expiryDate = new Date(purchaseDate.getTime() + product.defaultBestBeforeDays * 86400000);
-        }
       }
 
-      const newQty = item.quantity + dto.quantity;
+      // Auto-calculate expiry date from product defaults if not provided
+      let expiryDate = dto.expiryDate ? new Date(dto.expiryDate) : null;
+      if (!expiryDate && product?.defaultBestBeforeDays) {
+        const purchaseDate = dto.purchaseDate ? new Date(dto.purchaseDate) : new Date();
+        expiryDate = new Date(purchaseDate.getTime() + product.defaultBestBeforeDays * 86400000);
+      }
+
+      // Unit conversion: if purchase unit differs from stock unit, convert
+      let stockQuantity = dto.quantity;
+      if (product?.purchaseUnit && product?.stockUnit && product.purchaseUnit !== product.stockUnit) {
+        const factor = product.purchaseToStockFactor || 1;
+        stockQuantity = dto.quantity * factor;
+        this.logger.log(`单位转换: ${dto.quantity} ${product.purchaseUnit} → ${stockQuantity} ${product.stockUnit}`);
+      }
+
+      const newQty = item.quantity + stockQuantity;
 
       // Create batch record for this stock-in
       const batchResult = tx.insert(invItemBatches).values({
         itemId,
         batchNumber: dto.batchNumber || null,
-        quantity: dto.quantity,
-        unit: item.unit,
+        quantity: stockQuantity,
+        unit: product?.stockUnit || item.unit,
         purchaseDate: dto.purchaseDate ? new Date(dto.purchaseDate) : null,
         expiryDate,
         locationId: dto.locationId || item.locationId,

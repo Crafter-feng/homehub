@@ -58,6 +58,37 @@
           </n-input-number>
         </div>
       </div>
+      <div class="pfd-section-title">多单位设置 (可选)</div>
+      <div class="pfd-grid">
+        <div class="pfd-row">
+          <label class="pfd-label">采购单位</label>
+          <n-select v-model:value="form.purchaseUnit" :options="unitOptions" clearable placeholder="如: 箱/袋" size="large" />
+        </div>
+        <div class="pfd-row">
+          <label class="pfd-label">库存单位</label>
+          <n-select v-model:value="form.stockUnit" :options="unitOptions" clearable placeholder="如: 个/瓶" size="large" />
+        </div>
+      </div>
+      <div class="pfd-grid">
+        <div class="pfd-row">
+          <label class="pfd-label">消耗单位</label>
+          <n-select v-model:value="form.consumeUnit" :options="unitOptions" clearable placeholder="如: 克/毫升" size="large" />
+        </div>
+        <div class="pfd-row">
+          <label class="pfd-label">价格单位</label>
+          <n-select v-model:value="form.priceUnit" :options="unitOptions" clearable placeholder="如: 千克" size="large" />
+        </div>
+      </div>
+      <div class="pfd-grid">
+        <div class="pfd-row">
+          <label class="pfd-label">采购→库存 转换因子</label>
+          <n-input-number v-model:value="form.purchaseToStockFactor" :min="0.01" :step="0.1" size="large" style="width: 100%" />
+        </div>
+        <div class="pfd-row">
+          <label class="pfd-label">库存→消耗 转换因子</label>
+          <n-input-number v-model:value="form.stockToConsumeFactor" :min="0.01" :step="0.1" size="large" style="width: 100%" />
+        </div>
+      </div>
       <div class="pfd-row">
         <label class="pfd-label">备注</label>
         <n-input v-model:value="form.notes" type="textarea" placeholder="可选" :rows="2" />
@@ -117,6 +148,12 @@ const form = reactive({
   defaultPrice: null as number | null,
   defaultBestBeforeDays: null as number | null,
   defaultBestBeforeDaysAfterOpen: null as number | null,
+  purchaseUnit: '',
+  stockUnit: '',
+  consumeUnit: '',
+  priceUnit: '',
+  purchaseToStockFactor: 1,
+  stockToConsumeFactor: 1,
   notes: '',
 });
 
@@ -152,6 +189,12 @@ watch(() => props.visible, async (val) => {
     form.defaultPrice = props.product?.defaultPrice || null;
     form.defaultBestBeforeDays = props.product?.defaultBestBeforeDays || null;
     form.defaultBestBeforeDaysAfterOpen = props.product?.defaultBestBeforeDaysAfterOpen || null;
+    form.purchaseUnit = props.product?.purchaseUnit || '';
+    form.stockUnit = props.product?.stockUnit || '';
+    form.consumeUnit = props.product?.consumeUnit || '';
+    form.priceUnit = props.product?.priceUnit || '';
+    form.purchaseToStockFactor = props.product?.purchaseToStockFactor || 1;
+    form.stockToConsumeFactor = props.product?.stockToConsumeFactor || 1;
     form.notes = props.product?.notes || '';
     try {
       const [catRes, unitRes, brandRes] = await Promise.all([
@@ -184,6 +227,12 @@ async function save() {
       defaultPrice: form.defaultPrice || undefined,
       defaultBestBeforeDays: form.defaultBestBeforeDays || undefined,
       defaultBestBeforeDaysAfterOpen: form.defaultBestBeforeDaysAfterOpen || undefined,
+      purchaseUnit: form.purchaseUnit || undefined,
+      stockUnit: form.stockUnit || undefined,
+      consumeUnit: form.consumeUnit || undefined,
+      priceUnit: form.priceUnit || undefined,
+      purchaseToStockFactor: form.purchaseToStockFactor || undefined,
+      stockToConsumeFactor: form.stockToConsumeFactor || undefined,
       notes: form.notes || undefined,
     };
     let res;
@@ -227,4 +276,5 @@ function handleImageUpload() {
 .pfd-image-row { display: flex; gap: 6px; }
 .pfd-image-preview { width: 80px; height: 80px; object-fit: cover; border-radius: 8px; border: 1px solid var(--hh-border-light); margin-top: 4px; }
 .pfd-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.pfd-section-title { font-size: 13px; font-weight: 600; color: var(--hh-text-secondary); margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--hh-border-light); }
 </style>

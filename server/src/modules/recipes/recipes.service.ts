@@ -206,4 +206,54 @@ export class RecipesService {
       results,
     };
   }
+
+  /**
+   * 计算食谱的 Due Score — 临期食材优先级
+   * 分数越高，表示该食谱使用的临期食材越多
+   */
+  async getDueScore(recipeId: number, familyId: number): Promise<number> {
+    const recipe = await this.getById(recipeId);
+    if (!recipe) return 0;
+
+    const ingredients = (recipe.ingredients as any[]) || [];
+    if (ingredients.length === 0) return 0;
+
+    let dueScore = 0;
+    let totalIngredients = 0;
+
+    for (const ing of ingredients) {
+      if (!ing.itemId) continue;
+      totalIngredients++;
+
+      const item = await this.db.select().from(invItems)
+        .where(and(eq(invItems.id, ing.itemId), eq(invItems.familyId, familyId)))
+        .get();
+
+      if (!item) continue;
+
+      // Calculate urgency based on expiry date
+      if (item.expiryDate) {
+        const now = Date.now();
+        const expiry = new Date(item.expiryDate).getTime();
+        const daysUntilExpiry = (expiry - now) / (1000 * 60 * 60 * 24);
+
+        if (daysUntilExpiry < 0) {
+          // Already expired — highest urgency
+          dueScore += 10;
+        } else if (daysUntilExpiry <= 3) {
+          // Expiring within 3 days
+          dueScore += 7;
+        } else if (daysUntilExpiry <= 7) {
+          // Expiring within 7 days
+          dueScore += 4;
+        } else if (daysUntilExpiry <= 14) {
+          // Expiring within 14 days
+          dueScore += 2;
+        }
+      }
+    }
+
+    // Normalize score to 0-100 range
+    return totalIngredients > 0 ? Math.round((dueScore / (totalIngredients * 10)) * 100) : 0;
+  }
 }

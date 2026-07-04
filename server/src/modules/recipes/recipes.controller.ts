@@ -18,6 +18,11 @@ export class RecipesController {
     return this.recipesService.getRecommendations(req.user.familyId, limit ? parseInt(limit) : 5);
   }
 
+  @Get(':id/due-score')
+  getDueScore(@Param('id') id: string, @Request() req: any) {
+    return this.recipesService.getDueScore(parseInt(id), req.user.familyId);
+  }
+
   @Get(':id')
   getRecipe(@Param('id') id: string) {
     return this.recipesService.getById(parseInt(id));

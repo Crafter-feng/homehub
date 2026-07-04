@@ -2,7 +2,7 @@
 // 认证 & 家庭 — 用户、家庭、成员、令牌
 // ═══════════════════════════════════════════════════════
 
-import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
 // ── 用户 ──
 export const users = sqliteTable('users', {
@@ -12,6 +12,7 @@ export const users = sqliteTable('users', {
   passwordHash: text('password_hash').notNull(),
   avatar: text('avatar'),
   role: text('role').default('editor'),
+  isAdmin: integer('is_admin', { mode: 'boolean' }).default(false),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
 });
@@ -31,7 +32,9 @@ export const familyMembers = sqliteTable('family_members', {
   familyId: integer('family_id').notNull().references(() => families.id, { onDelete: 'cascade' }),
   role: text('role', { enum: ['admin', 'editor', 'viewer'] }).notNull().default('editor'),
   joinedAt: integer('joined_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
-});
+}, (table) => ({
+  userFamilyUnique: uniqueIndex('family_members_user_family_unique').on(table.userId, table.familyId),
+}));
 
 // ── API 令牌 ──
 export const apiTokens = sqliteTable('api_tokens', {

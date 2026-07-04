@@ -14,16 +14,12 @@ export class HistoryService {
   /**
    * 获取单物品完整变更记录（需验证 familyId 归属）
    */
-  async getItemHistory(itemId: number, familyId?: number) {
-    const conditions: any[] = [eq(invStockTransactions.itemId, itemId)];
-
-    // If familyId provided, verify item belongs to family
-    if (familyId) {
-      const item = await this.db.select().from(invItems)
-        .where(and(eq(invItems.id, itemId), eq(invItems.familyId, familyId)))
-        .get();
-      if (!item) return [];
-    }
+  async getItemHistory(itemId: number, familyId: number) {
+    // Verify item belongs to family (prevent cross-family access)
+    const item = await this.db.select().from(invItems)
+      .where(and(eq(invItems.id, itemId), eq(invItems.familyId, familyId)))
+      .get();
+    if (!item) return [];
 
     return this.db.select({
       id: invStockTransactions.id,
@@ -42,7 +38,7 @@ export class HistoryService {
     })
       .from(invStockTransactions)
       .leftJoin(users, eq(invStockTransactions.userId, users.id))
-      .where(and(...conditions))
+      .where(eq(invStockTransactions.itemId, itemId))
       .orderBy(desc(invStockTransactions.createdAt))
       .all();
   }

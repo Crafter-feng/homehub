@@ -14,6 +14,7 @@ export const hhLists = sqliteTable('hh_lists', {
   type: text('type', {
     enum: ['shopping', 'todo', 'chore', 'holiday', 'meal_plan'],
   }).notNull().default('shopping'),
+  groupBy: text('group_by').default('none'),
   notes: text('notes'),
   config: text('config', { mode: 'json' }).$type<{
     autoReset?: string;

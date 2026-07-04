@@ -21,8 +21,11 @@
           <n-tag v-if="isLowStock" size="small" round :bordered="false" type="warning">低库存</n-tag>
         </div>
 
-        <!-- 关键信息 stat 卡片 -->
-        <div class="stat-row">
+        <!-- Tabs -->
+        <n-tabs type="line" animated default-value="info" style="margin-top: 12px">
+          <n-tab-pane name="info" tab="详情">
+            <!-- 关键信息 stat 卡片 -->
+            <div class="stat-row">
           <div class="detail-stat">
             <span class="detail-stat-label">数量</span>
             <span class="detail-stat-value">{{ item.quantity }} {{ item.unit }}</span>
@@ -92,6 +95,39 @@
             </div>
           </div>
         </div>
+          </n-tab-pane>
+
+          <!-- 批次 Tab -->
+          <n-tab-pane name="batches" tab="批次">
+            <div class="batch-section">
+              <div class="batch-header">
+                <span class="batch-count">共 {{ batches.length }} 个批次</span>
+                <n-button size="small" @click="handleCompactBatches" :loading="compacting">
+                  合并批次
+                </n-button>
+              </div>
+              <div v-if="batches.length === 0" class="batch-empty">暂无批次数据</div>
+              <div v-else class="batch-list">
+                <div v-for="batch in batches" :key="batch.id" class="batch-item">
+                  <div class="batch-info">
+                    <span class="batch-number">{{ batch.batchNumber || `批次#${batch.id}` }}</span>
+                    <span class="batch-qty">{{ batch.quantity }} {{ batch.unit }}</span>
+                  </div>
+                  <div class="batch-meta">
+                    <span v-if="batch.expiryDate" :class="{ 'text-danger': isBatchExpired(batch) }">
+                      到期: {{ formatDate(batch.expiryDate) }}
+                    </span>
+                    <span v-if="batch.locationId">位置: {{ getLocationName(batch.locationId) }}</span>
+                  </div>
+                  <div class="batch-actions">
+                    <n-button size="tiny" quaternary @click="editBatch(batch)">编辑</n-button>
+                    <n-button size="tiny" quaternary type="error" @click="deleteBatch(batch)">删除</n-button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </n-tab-pane>
+        </n-tabs>
       </div>
     </n-spin>
 
@@ -195,6 +231,10 @@ const stockInQuantity = ref(1);
 const stockInNote = ref('');
 const transferLocation = ref<number | null>(null);
 
+// Batch state
+const batches = ref<any[]>([]);
+const compacting = ref(false);
+
 const locationSelectOptions = computed(() =>
   locations.value.map(l => ({ label: l.name, value: l.id }))
 );
@@ -243,6 +283,7 @@ const loadData = async () => {
     item.value = itemRes.data;
     history.value = historyRes.data || [];
     locations.value = (locRes.data || []) as Location[];
+    loadBatches();
   } catch {
     message.error('加载失败');
   } finally {
@@ -308,6 +349,59 @@ const handleTransfer = async () => {
     const err = e as { response?: { data?: { message?: string } } };
     message.error(err.response?.data?.message || '操作失败');
   }
+};
+
+// Batch methods
+const loadBatches = async () => {
+  if (!item.value) return;
+  try {
+    const res = await stockApi.getBatchSummary(item.value.id);
+    batches.value = res.data || [];
+  } catch {
+    batches.value = [];
+  }
+};
+
+const isBatchExpired = (batch: any) => {
+  return batch.expiryDate && new Date(batch.expiryDate) < new Date();
+};
+
+const handleCompactBatches = async () => {
+  if (!item.value) return;
+  compacting.value = true;
+  try {
+    const res = await stockApi.compactBatches(item.value.id);
+    message.success(res.data?.message || '合并完成');
+    loadBatches();
+    loadData();
+  } catch {
+    message.error('合并失败');
+  } finally {
+    compacting.value = false;
+  }
+};
+
+const editBatch = (_batch: any) => {
+  message.info('批次编辑功能开发中');
+};
+
+const deleteBatch = async (batch: any) => {
+  dialog.warning({
+    title: '删除批次',
+    content: `确定要删除批次 ${batch.batchNumber || batch.id} 吗？`,
+    positiveText: '删除',
+    negativeText: '取消',
+    onPositiveClick: async () => {
+      try {
+        await stockApi.deleteBatch(batch.id);
+        message.success('删除成功');
+        loadBatches();
+        loadData();
+      } catch {
+        message.error('删除失败');
+      }
+    },
+  });
 };
 
 const handleDelete = () => {
@@ -504,5 +598,75 @@ const handleDelete = () => {
   display: flex;
   gap: 8px;
   margin-top: 2px;
+}
+
+/* Batch section */
+.batch-section {
+  padding: 8px 0;
+}
+
+.batch-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.batch-count {
+  font-size: 13px;
+  color: var(--hh-text-secondary);
+}
+
+.batch-empty {
+  text-align: center;
+  padding: 24px;
+  color: var(--hh-text-tertiary);
+}
+
+.batch-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.batch-item {
+  padding: 10px 12px;
+  border: 1px solid var(--hh-border-light, #e0e0e6);
+  border-radius: 8px;
+  background: var(--hh-bg-secondary, #f5f5f5);
+}
+
+.batch-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.batch-number {
+  font-weight: 500;
+  font-size: 13px;
+}
+
+.batch-qty {
+  font-weight: 600;
+  color: var(--hh-primary);
+}
+
+.batch-meta {
+  display: flex;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--hh-text-secondary);
+  margin-bottom: 8px;
+}
+
+.batch-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.text-danger {
+  color: var(--hh-error, #e53e3e);
 }
 </style>
