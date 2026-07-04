@@ -4,6 +4,7 @@ import { invProducts } from '../../db/schema';
 import { CreateProductDto, UpdateProductDto } from './dto/products.dto';
 import { DATABASE_TOKEN } from '../../db/database.module';
 import type { Database } from '../../db/types';
+import { pickDefined } from '../../common';
 
 @Injectable()
 export class ProductsService {
@@ -58,11 +59,15 @@ export class ProductsService {
       .get();
     if (!existing) throw new NotFoundException('产品不存在');
 
+    const updates = pickDefined(dto as Record<string, unknown>, [
+      'name', 'barcode', 'categoryId', 'unit', 'brand', 'image',
+      'defaultPrice', 'defaultBestBeforeDays', 'defaultBestBeforeDaysAfterOpen',
+      'moveOnOpenLocationId', 'parentId', 'caloriesPerUnit', 'notes',
+    ]);
+    (updates as Record<string, unknown>).updatedAt = new Date();
+
     this.db.update(invProducts)
-      .set({
-        ...dto,
-        updatedAt: new Date(),
-      })
+      .set(updates as any)
       .where(eq(invProducts.id, id))
       .run();
 

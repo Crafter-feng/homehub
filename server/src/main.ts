@@ -4,6 +4,7 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';
 import { AppModule } from './app.module';
 import { validateEnv } from './config/env.validation';
+import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 
 async function bootstrap() {
   // 启动前校验环境变量
@@ -12,6 +13,9 @@ async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
   app.setGlobalPrefix('api/v1');
+
+  // 全局异常过滤器 — 统一错误格式，防止堆栈泄漏
+  app.useGlobalFilters(new AllExceptionsFilter());
 
   // 静态文件服务（头像等上传文件）
   app.useStaticAssets(join(__dirname, '..', 'uploads'), { prefix: '/uploads' });

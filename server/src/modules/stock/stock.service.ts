@@ -330,7 +330,7 @@ export class StockService {
       tx.insert(invStockTransactions).values({
         itemId,
         batchId,
-        type: 'stock-in',
+        type: 'add',
         quantity: dto.quantity,
         unit: item.unit,
         toLocationId: dto.locationId || item.locationId,
@@ -409,10 +409,14 @@ export class StockService {
   }
 
   async getHistory(itemId: number, familyId: number) {
+    // Verify item belongs to family (prevent cross-family access)
+    const item = await this.db.select().from(invItems)
+      .where(and(eq(invItems.id, itemId), eq(invItems.familyId, familyId)))
+      .get();
+    if (!item) throw new NotFoundException('物品不存在');
+
     return this.db.select().from(invStockTransactions)
-      .where(and(
-        eq(invStockTransactions.itemId, itemId),
-      ))
+      .where(eq(invStockTransactions.itemId, itemId))
       .orderBy(desc(invStockTransactions.createdAt))
       .all();
   }

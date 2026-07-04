@@ -41,23 +41,20 @@ export class AdminService {
   }
 
   /**
-   * 家庭列表 + 每家庭成员数
+   * 家庭列表 + 每家庭成员数（单条 SQL，无 N+1）
    */
   async listFamilies() {
-    const familiesList = await this.db.select().from(families).all();
-
-    const result: any[] = [];
-    for (const family of familiesList) {
-      const memberCountResult = await this.db.select({ count: sql<number>`count(*)` })
-        .from(familyMembers)
-        .where(eq(familyMembers.familyId, family.id))
-        .get();
-      result.push({
-        ...family,
-        memberCount: memberCountResult?.count ?? 0,
-      });
-    }
-    return result;
+    return this.db.select({
+      id: families.id,
+      name: families.name,
+      inviteCode: families.inviteCode,
+      createdAt: families.createdAt,
+      memberCount: sql<number>`coalesce(count(${familyMembers.id}), 0)`,
+    })
+      .from(families)
+      .leftJoin(familyMembers, eq(families.id, familyMembers.familyId))
+      .groupBy(families.id)
+      .all();
   }
 
   /**

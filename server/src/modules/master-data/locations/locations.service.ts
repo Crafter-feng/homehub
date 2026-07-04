@@ -77,25 +77,30 @@ export class LocationsService {
       .get();
     if (!loc) throw new NotFoundException('位置不存在');
 
-    const children = await this.db.select().from(mdLocations)
-      .where(eq(mdLocations.parentId, locationId))
-      .all();
-    if (children.length > 0) {
+    // Wrap in transaction for data consistency
+    return this.db.transaction((tx: any) => {
+      // Move children to parent
+      const children = tx.select().from(mdLocations)
+        .where(eq(mdLocations.parentId, locationId))
+        .all();
       for (const child of children) {
-        await this.db.update(mdLocations)
+        tx.update(mdLocations)
           .set({ parentId: loc.parentId })
           .where(eq(mdLocations.id, child.id))
           .run();
       }
-    }
 
-    await this.db.update(invItems)
-      .set({ locationId: null })
-      .where(eq(invItems.locationId, locationId))
-      .run();
+      // Clear location from items
+      tx.update(invItems)
+        .set({ locationId: null })
+        .where(eq(invItems.locationId, locationId))
+        .run();
 
-    await this.db.delete(mdLocations).where(eq(mdLocations.id, locationId)).run();
-    return { success: true };
+      // Delete the location
+      tx.delete(mdLocations).where(eq(mdLocations.id, locationId)).run();
+
+      return { success: true };
+    });
   }
 
   private buildTree(locs: any[], parentId: number | null = null): any[] {
