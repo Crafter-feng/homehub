@@ -24,50 +24,50 @@
 
         <!-- Tabs — 固定高度，内部滚动 -->
         <n-tabs type="line" animated default-value="info" class="detail-tabs">
-          <n-tab-pane name="info" tab="物品信息" class="tab-scroll">
+          <n-tab-pane name="info" :tab="t('stock.itemInfo')" class="tab-scroll">
             <div class="stat-row">
-              <div class="detail-stat">
-                <span class="detail-stat-label">数量</span>
-                <span class="detail-stat-value">{{ item.quantity }} {{ item.unit }}</span>
-                <span class="detail-stat-sub" v-if="item.minStock">最低 {{ item.minStock }}</span>
-              </div>
-              <div class="detail-stat">
-                <span class="detail-stat-label">位置</span>
-                <span class="detail-stat-value">{{ getLocationName(item.locationId) }}</span>
-              </div>
-              <div class="detail-stat">
-                <span class="detail-stat-label">保质期</span>
+          <div class="detail-stat">
+            <span class="detail-stat-label">{{ t('stock.quantityLabel') }}</span>
+            <span class="detail-stat-value">{{ item.quantity }} {{ item.unit }}</span>
+            <span class="detail-stat-sub" v-if="item.minStock">{{ t('stock.minStock') }} {{ item.minStock }}</span>
+          </div>
+          <div class="detail-stat">
+            <span class="detail-stat-label">{{ t('stock.location') }}</span>
+            <span class="detail-stat-value">{{ getLocationName(item.locationId) }}</span>
+          </div>
+          <div class="detail-stat">
+            <span class="detail-stat-label">{{ t('stock.expiryDate') }}</span>
                 <span class="detail-stat-value" :class="{ 'text-danger': isExpired }">
                   {{ item.expiryDate ? formatDate(item.expiryDate) : '无' }}
                 </span>
               </div>
             </div>
 
-            <div class="detail-grid">
-              <div class="detail-section">
-                <h3 class="detail-section-title">购买信息</h3>
-                <div class="detail-field">
-                  <span class="detail-field-label">购买价格</span>
+        <div class="detail-grid">
+          <div class="detail-section">
+            <h3 class="detail-section-title">{{ t('stock.purchaseInfo') }}</h3>
+            <div class="detail-field">
+              <span class="detail-field-label">{{ t('stock.purchasePrice') }}</span>
                   <span class="detail-field-value">{{ item.purchasePrice ? `¥${item.purchasePrice}` : '-' }}</span>
                 </div>
-                <div class="detail-field">
-                  <span class="detail-field-label">购买日期</span>
+            <div class="detail-field">
+              <span class="detail-field-label">{{ t('stock.purchaseDate') }}</span>
                   <span class="detail-field-value">{{ item.purchaseDate ? formatDate(item.purchaseDate) : '-' }}</span>
                 </div>
-                <div class="detail-field">
-                  <span class="detail-field-label">品牌</span>
+            <div class="detail-field">
+              <span class="detail-field-label">{{ t('stock.brand') }}</span>
                   <span class="detail-field-value">{{ item.brand || '-' }}</span>
                 </div>
-                <div class="detail-field" v-if="item.shop">
-                  <span class="detail-field-label">商店</span>
+            <div class="detail-field" v-if="item.shop">
+              <span class="detail-field-label">{{ t('stock.shop') }}</span>
                   <span class="detail-field-value">{{ item.shop }}</span>
                 </div>
               </div>
-              <div class="detail-section">
-                <h3 class="detail-section-title">备注</h3>
-                <div class="detail-notes">{{ item.notes || '暂无备注' }}</div>
-                <div class="detail-field">
-                  <span class="detail-field-label">条码</span>
+          <div class="detail-section">
+            <h3 class="detail-section-title">{{ t('stock.notes') }}</h3>
+            <div class="detail-notes">{{ item.notes || '-' }}</div>
+            <div class="detail-field">
+              <span class="detail-field-label">{{ t('stock.barcode') }}</span>
                   <span class="detail-field-value">{{ item.barcode || '-' }}</span>
                 </div>
               </div>
@@ -75,20 +75,20 @@
           </n-tab-pane>
 
           <!-- 价格追踪 Tab -->
-          <n-tab-pane name="price" tab="价格追踪" class="tab-scroll">
+          <n-tab-pane name="price" :tab="t('stock.priceTrack')" class="tab-scroll">
             <PriceHistoryChart v-if="item" :item-id="item.id" />
           </n-tab-pane>
 
           <!-- 批次 Tab -->
-          <n-tab-pane name="batches" tab="批次信息" class="tab-scroll">
+          <n-tab-pane name="batches" :tab="t('stock.batchInfo')" class="tab-scroll">
             <div class="batch-section">
               <div class="batch-header">
-                <span class="batch-count">共 {{ batches.length }} 个批次</span>
+                <span class="batch-count">{{ t('stock.batchesCount', { count: batches.length }) }}</span>
                 <n-button size="small" @click="handleCompactBatches" :loading="compacting">
-                  合并批次
+                  {{ t('stock.compactBatches') }}
                 </n-button>
               </div>
-              <div v-if="batches.length === 0" class="batch-empty">暂无批次数据</div>
+              <div v-if="batches.length === 0" class="batch-empty">{{ t('stock.noBatches') }}</div>
               <div v-else class="batch-list">
                 <div v-for="batch in batches" :key="batch.id" class="batch-item">
                   <div class="batch-info">
@@ -102,15 +102,15 @@
                     <span v-if="batch.locationId">位置: {{ getLocationName(batch.locationId) }}</span>
                   </div>
                   <div class="batch-actions">
-                    <n-button size="tiny" quaternary @click="editBatch(batch)">编辑</n-button>
-                    <n-button size="tiny" quaternary type="error" @click="deleteBatch(batch)">删除</n-button>
+                    <n-button size="tiny" quaternary @click="editBatch(batch)">{{ t('common.edit') }}</n-button>
+                    <n-button size="tiny" quaternary type="error" @click="deleteBatch(batch)">{{ t('common.delete') }}</n-button>
                   </div>
                 </div>
               </div>
             </div>
           </n-tab-pane>
 
-          <n-tab-pane name="history" tab="操作记录" class="tab-scroll">
+          <n-tab-pane name="history" :tab="t('history.title')" class="tab-scroll">
             <div class="history-section" v-if="history.length > 0">
               <div class="timeline">
                 <div class="timeline-item" v-for="(record, index) in history" :key="record.id">
@@ -122,7 +122,7 @@
                       <span class="history-quantity">× {{ record.quantity }}</span>
                     </div>
                     <div class="timeline-meta">
-                      <span v-if="record.source">{{ record.source }}</span>
+                      <span v-if="record.source" class="meta-source">{{ translateSource(record.source) }}</span>
                       <span v-if="record.note">{{ record.note }}</span>
                       <span>{{ formatDateTime(record.createdAt) }}</span>
                     </div>
@@ -130,7 +130,7 @@
                 </div>
               </div>
             </div>
-            <n-empty v-else description="暂无操作记录" />
+            <n-empty v-else :description="t('history.noData')" />
           </n-tab-pane>
         </n-tabs>
       </div>
@@ -138,68 +138,68 @@
 
     <template #footer>
       <n-space justify="end" :wrap="false">
-        <n-button size="small" @click="openStockIn">入库</n-button>
-        <n-button size="small" @click="showConsumeModal = true">消耗</n-button>
-        <n-button size="small" @click="showTransferModal = true">转移</n-button>
-        <n-button size="small" type="error" ghost @click="handleDelete(item.id, item.name)">删除</n-button>
+        <n-button size="small" @click="openStockIn">{{ t('stock.stockIn') }}</n-button>
+        <n-button size="small" @click="showConsumeModal = true">{{ t('stock.consume') }}</n-button>
+        <n-button size="small" @click="showTransferModal = true">{{ t('stock.transfer') }}</n-button>
+        <n-button size="small" type="error" ghost @click="handleDelete(item.id, item.name)">{{ t('common.delete') }}</n-button>
       </n-space>
     </template>
 
     <!-- 消耗 Modal -->
-    <n-modal v-model:show="showConsumeModal" title="消耗物品" preset="card" style="max-width: 400px">
-      <n-form-item label="数量">
+    <n-modal v-model:show="showConsumeModal" :title="t('stock.consumeItem')" preset="card" style="max-width: 400px">
+      <n-form-item :label="t('stock.quantityLabel')">
         <n-input-number v-model:value="consumeQuantity" :min="0.01" :max="item?.quantity" style="width: 100%" />
       </n-form-item>
-      <n-form-item label="备注">
-        <n-input v-model:value="consumeNote" placeholder="可选" />
+      <n-form-item :label="t('stock.noteLabel')">
+        <n-input v-model:value="consumeNote" :placeholder="t('stock.stockInNotePlaceholder')" />
       </n-form-item>
       <template #footer>
         <n-space justify="end">
-          <n-button @click="showConsumeModal = false">取消</n-button>
-          <n-button type="primary" @click="handleConsume">确认</n-button>
+          <n-button @click="showConsumeModal = false">{{ t('common.cancel') }}</n-button>
+          <n-button type="primary" @click="handleConsume">{{ t('common.confirm') }}</n-button>
         </n-space>
       </template>
     </n-modal>
 
     <!-- 转移 Modal -->
-    <n-modal v-model:show="showTransferModal" title="转移物品" preset="card" style="max-width: 400px">
-      <n-form-item label="目标位置">
+    <n-modal v-model:show="showTransferModal" :title="t('stock.transferItem')" preset="card" style="max-width: 400px">
+      <n-form-item :label="t('stock.toLocation')">
         <n-select v-model:value="transferLocation" :options="locationSelectOptions" />
       </n-form-item>
       <template #footer>
         <n-space justify="end">
-          <n-button @click="showTransferModal = false">取消</n-button>
-          <n-button type="primary" @click="handleTransfer">确认</n-button>
+          <n-button @click="showTransferModal = false">{{ t('common.cancel') }}</n-button>
+          <n-button type="primary" @click="handleTransfer">{{ t('common.confirm') }}</n-button>
         </n-space>
       </template>
     </n-modal>
 
     <!-- 入库 Modal -->
-    <n-modal v-model:show="showStockInModal" title="入库" preset="card" style="max-width: 400px">
+    <n-modal v-model:show="showStockInModal" :title="t('stock.stockIn')" preset="card" style="max-width: 400px">
       <div v-if="item">
-        <div style="margin-bottom: 12px; color: var(--hh-text-secondary)">当前库存: {{ item.quantity }} {{ item.unit }}</div>
-        <n-form-item label="入库数量">
+        <div style="margin-bottom: 12px; color: var(--hh-text-secondary)">{{ t('stock.currentStock') }}: {{ item.quantity }} {{ item.unit }}</div>
+        <n-form-item :label="t('stock.stockInQuantity')">
           <n-input-number v-model:value="stockInQuantity" :min="0.01" :max="9999" style="width: 100%" />
         </n-form-item>
-        <n-form-item label="本次价格">
-          <n-input-number v-model:value="stockInPrice" :min="0" :precision="2" placeholder="可选" style="width: 100%">
+        <n-form-item :label="t('stock.purchasePrice')">
+          <n-input-number v-model:value="stockInPrice" :min="0" :precision="2" :placeholder="t('stock.stockInNotePlaceholder')" style="width: 100%">
             <template #prefix>¥</template>
           </n-input-number>
         </n-form-item>
-        <n-form-item label="商店">
-          <n-input v-model:value="stockInShop" placeholder="可选" />
+        <n-form-item :label="t('stock.shop')">
+          <n-input v-model:value="stockInShop" :placeholder="t('stock.stockInNotePlaceholder')" />
         </n-form-item>
-        <n-form-item label="备注">
-          <n-input v-model:value="stockInNote" placeholder="备注（可选）" />
+        <n-form-item :label="t('stock.noteLabel')">
+          <n-input v-model:value="stockInNote" :placeholder="t('stock.stockInNotePlaceholder')" />
         </n-form-item>
         <div v-if="stockInQuantity > 0" style="color: var(--hh-success); font-weight: 500">
-          入库后库存: {{ item.quantity + stockInQuantity }} {{ item.unit }}
+          {{ t('stock.stockAfterIn') }}: {{ item.quantity + stockInQuantity }} {{ item.unit }}
         </div>
       </div>
       <template #footer>
         <n-space justify="end">
-          <n-button @click="showStockInModal = false">取消</n-button>
-          <n-button type="success" @click="handleStockIn">确认入库</n-button>
+          <n-button @click="showStockInModal = false">{{ t('common.cancel') }}</n-button>
+          <n-button type="success" @click="handleStockIn">{{ t('stock.confirmStockIn') }}</n-button>
         </n-space>
       </template>
     </n-modal>
@@ -216,6 +216,7 @@ import { stockApi, locationsApi } from '@/api/client';
 import PriceHistoryChart from './PriceHistoryChart.vue';
 import { getCategoryColor, getHistoryColor } from '@/utils/format';
 import { useStockItem } from '@/composables/useStockItem';
+import { useI18n } from '@/locales';
 
 const props = defineProps<{
   show: boolean;
@@ -230,6 +231,7 @@ const emit = defineEmits<{
 
 const message = useMessage();
 const dialog = useDialog();
+const { t } = useI18n();
 
 const {
   item, history, locations, loading,
@@ -249,15 +251,8 @@ const {
 const batches = ref<any[]>([]);
 const compacting = ref(false);
 
-const typeTranslationMap: Record<string, string> = {
-  'add': '入库',
-  'stock-in': '入库',
-  'consume': '消耗',
-  'transfer': '转移',
-  'adjust': '调整',
-};
-
-const translateType = (type: string): string => typeTranslationMap[type] || type;
+const translateType = (type: string): string => t(`history.${type}`) || type;
+const translateSource = (source: string): string => t(`history.${source}`) || source;
 
 const loadBatches = async () => {
   if (!item.value) return;

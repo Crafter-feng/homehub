@@ -2,10 +2,12 @@ import { ref, computed } from 'vue';
 import { useMessage, useDialog } from 'naive-ui';
 import { stockApi, locationsApi } from '@/api/client';
 import type { Item, StockTransaction, Location } from '@/shared/types';
+import { useI18n } from '@/locales';
 
 export function useStockItem(options?: { onUpdated?: () => void; onDeleted?: () => void }) {
   const message = useMessage();
   const dialog = useDialog();
+  const { t } = useI18n();
 
   const item = ref<Item | null>(null);
   const history = ref<StockTransaction[]>([]);
@@ -77,7 +79,7 @@ export function useStockItem(options?: { onUpdated?: () => void; onDeleted?: () 
       history.value = historyRes.data || [];
       locations.value = (locRes.data || []) as Location[];
     } catch {
-      message.error('加载失败');
+      message.error(t('stock.loadFailed'));
     } finally {
       loading.value = false;
     }
@@ -101,13 +103,13 @@ export function useStockItem(options?: { onUpdated?: () => void; onDeleted?: () 
         price: stockInPrice.value ?? undefined,
         shop: stockInShop.value || undefined,
       });
-      message.success('入库成功');
+      message.success(t('stock.stockInSuccess'));
       showStockInModal.value = false;
       loadData(item.value.id);
       options?.onUpdated?.();
     } catch (e: unknown) {
       const err = e as { response?: { data?: { message?: string } } };
-      message.error(err.response?.data?.message || '操作失败');
+      message.error(err.response?.data?.message || t('stock.stockInFail'));
     }
   };
 
@@ -115,48 +117,48 @@ export function useStockItem(options?: { onUpdated?: () => void; onDeleted?: () 
     if (!item.value) return;
     try {
       await stockApi.consume(item.value.id, { quantity: consumeQuantity.value, note: consumeNote.value });
-      message.success('消耗成功');
+      message.success(t('stock.consumeSuccess'));
       showConsumeModal.value = false;
       loadData(item.value.id);
       options?.onUpdated?.();
     } catch (e: unknown) {
       const err = e as { response?: { data?: { message?: string } } };
-      message.error(err.response?.data?.message || '操作失败');
+      message.error(err.response?.data?.message || t('stock.consumeFail'));
     }
   };
 
   const handleTransfer = async () => {
     if (!item.value) return;
     if (!transferLocation.value) {
-      message.warning('请选择目标位置');
+      message.warning(t('stock.selectLocation'));
       return;
     }
     try {
       await stockApi.transfer(item.value.id, { toLocationId: transferLocation.value });
-      message.success('转移成功');
+      message.success(t('stock.transferSuccess'));
       showTransferModal.value = false;
       loadData(item.value.id);
       options?.onUpdated?.();
     } catch (e: unknown) {
       const err = e as { response?: { data?: { message?: string } } };
-      message.error(err.response?.data?.message || '操作失败');
+      message.error(err.response?.data?.message || t('stock.transferFail'));
     }
   };
 
   const handleDelete = (itemId: number, itemName: string) => {
     dialog.warning({
-      title: '确认删除',
-      content: `确定要删除 "${itemName}" 吗？`,
-      positiveText: '删除',
-      negativeText: '取消',
+      title: t('stock.confirmDelete'),
+      content: t('stock.confirmDeleteMsg', { name: itemName }),
+      positiveText: t('common.delete'),
+      negativeText: t('common.cancel'),
       onPositiveClick: async () => {
         try {
           await stockApi.delete(itemId);
-          message.success('删除成功');
+          message.success(t('stock.deleteSuccess'));
           options?.onDeleted?.();
         } catch (e: unknown) {
           const err = e as { response?: { data?: { message?: string } } };
-          message.error(err.response?.data?.message || '删除失败');
+          message.error(err.response?.data?.message || t('stock.deleteFail'));
         }
       },
     });

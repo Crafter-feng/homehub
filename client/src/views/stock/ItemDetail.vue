@@ -19,9 +19,9 @@
               {{ item.type }}
             </n-tag>
             <n-tag v-if="item.spec" size="small" round :bordered="false" type="info">{{ item.spec }}</n-tag>
-            <n-tag v-if="isExpired" size="small" round :bordered="false" type="error">已过期</n-tag>
-            <n-tag v-else-if="isExpiringSoon" size="small" round :bordered="false" type="warning">即将过期</n-tag>
-            <n-tag v-if="isLowStock" size="small" round :bordered="false" type="warning">低库存</n-tag>
+            <n-tag v-if="isExpired" size="small" round :bordered="false" type="error">{{ t('stock.expired') }}</n-tag>
+            <n-tag v-else-if="isExpiringSoon" size="small" round :bordered="false" type="warning">{{ t('stock.expiringSoon') }}</n-tag>
+            <n-tag v-if="isLowStock" size="small" round :bordered="false" type="warning">{{ t('stock.lowStockLabel') }}</n-tag>
           </div>
         </div>
 
@@ -33,11 +33,11 @@
             <span class="detail-stat-sub" v-if="item.minStock">最低 {{ item.minStock }}</span>
           </div>
           <div class="detail-stat hover-lift">
-            <span class="detail-stat-label">位置</span>
+            <span class="detail-stat-label">{{ t('stock.location') }}</span>
             <span class="detail-stat-value">{{ getLocationName(item.locationId) }}</span>
           </div>
           <div class="detail-stat hover-lift">
-            <span class="detail-stat-label">保质期</span>
+            <span class="detail-stat-label">{{ t('stock.expiryDate') }}</span>
             <span class="detail-stat-value" :class="{ 'text-danger': isExpired }">
               {{ item.expiryDate ? formatDate(item.expiryDate) : '无' }}
             </span>
@@ -58,31 +58,31 @@
         <!-- 详情 2列网格 -->
         <div class="detail-grid">
           <div class="detail-section">
-            <h3 class="detail-section-title">购买信息</h3>
+            <h3 class="detail-section-title">{{ t('stock.purchaseInfo') }}</h3>
             <div class="detail-field">
-              <span class="detail-field-label">购买价格</span>
+              <span class="detail-field-label">{{ t('stock.purchasePrice') }}</span>
               <span class="detail-field-value">{{ item.purchasePrice ? `¥${item.purchasePrice}` : '-' }}</span>
             </div>
             <div class="detail-field">
-              <span class="detail-field-label">购买日期</span>
+              <span class="detail-field-label">{{ t('stock.purchaseDate') }}</span>
               <span class="detail-field-value">{{ item.purchaseDate ? formatDate(item.purchaseDate) : '-' }}</span>
             </div>
             <div class="detail-field">
-              <span class="detail-field-label">品牌</span>
+              <span class="detail-field-label">{{ t('stock.brand') }}</span>
               <span class="detail-field-value">{{ item.brand || '-' }}</span>
             </div>
             <div class="detail-field" v-if="item.shop">
-              <span class="detail-field-label">商店</span>
+              <span class="detail-field-label">{{ t('stock.shop') }}</span>
               <span class="detail-field-value">{{ item.shop }}</span>
             </div>
           </div>
           <div class="detail-section">
-            <h3 class="detail-section-title">{{ t('common.notes') }}</h3>
+            <h3 class="detail-section-title">{{ t('stock.notes') }}</h3>
             <div class="detail-notes">
-              {{ item.notes || '暂无备注' }}
+              {{ item.notes || '-' }}
             </div>
             <div class="detail-field">
-              <span class="detail-field-label">条码</span>
+              <span class="detail-field-label">{{ t('stock.barcode') }}</span>
               <span class="detail-field-value">{{ item.barcode || '-' }}</span>
             </div>
           </div>
@@ -111,7 +111,7 @@
 
         <!-- 操作历史 — 时间轴 -->
         <div class="history-section" v-if="history.length > 0">
-          <h3 class="detail-section-title">操作历史</h3>
+          <h3 class="detail-section-title">{{ t('history.title') }}</h3>
           <div class="timeline">
             <div class="timeline-item" v-for="(record, index) in history" :key="record.id">
               <div class="timeline-line" v-if="index < history.length - 1"></div>
@@ -124,7 +124,7 @@
                   <span v-if="record.shop" class="history-shop">@ {{ record.shop }}</span>
                 </div>
                 <div class="timeline-meta">
-                  <span v-if="record.source">{{ record.source }}</span>
+                  <span v-if="record.source" class="meta-source">{{ translateSource(record.source) }}</span>
                   <span v-if="record.note">{{ record.note }}</span>
                   <span>{{ formatDateTime(record.createdAt) }}</span>
                 </div>
@@ -167,28 +167,28 @@
     <!-- 入库 Modal -->
     <n-modal v-model:show="showStockInModal" :title="t('stock.stockIn')" preset="card" style="max-width: 420px">
       <div v-if="item" class="stock-in-detail-modal">
-        <div class="stock-in-current">当前库存: {{ item.quantity }} {{ item.unit }}</div>
-        <n-form-item label="数量">
+        <div class="stock-in-current">{{ t('stock.currentStock') }}: {{ item.quantity }} {{ item.unit }}</div>
+        <n-form-item :label="t('stock.stockInQuantity')">
           <n-input-number v-model:value="stockInQuantity" :min="0.01" :max="9999" style="width: 100%" />
         </n-form-item>
-        <n-form-item label="单价 (¥)">
-          <n-input-number v-model:value="stockInPrice" :min="0" placeholder="可选" style="width: 100%" />
+        <n-form-item :label="t('stock.purchasePrice')">
+          <n-input-number v-model:value="stockInPrice" :min="0" :placeholder="t('stock.stockInNotePlaceholder')" style="width: 100%" />
         </n-form-item>
-        <n-form-item label="商店">
+        <n-form-item :label="t('stock.shop')">
           <n-select
             v-model:value="stockInShop"
             :options="shopOptions"
             filterable
             tag
             clearable
-            placeholder="购买商店"
+            :placeholder="t('stock.stockInNotePlaceholder')"
           />
         </n-form-item>
-        <n-form-item :label="t('common.notes')">
+        <n-form-item :label="t('stock.noteLabel')">
           <n-input v-model:value="stockInNote" :placeholder="t('stock.stockInNotePlaceholder')" />
         </n-form-item>
         <div class="stock-in-preview" v-if="stockInQuantity > 0 && item">
-          入库后库存: <strong>{{ item.quantity + stockInQuantity }} {{ item.unit }}</strong>
+          {{ t('stock.stockAfterIn') }}: <strong>{{ item.quantity + stockInQuantity }} {{ item.unit }}</strong>
         </div>
       </div>
       <template #footer>
@@ -232,15 +232,8 @@ const {
   onDeleted: () => router.back(),
 });
 
-const typeTranslationMap: Record<string, string> = {
-  'add': '入库',
-  'stock-in': '入库',
-  'consume': '消耗',
-  'transfer': '转移',
-  'adjust': '调整',
-};
-
-const translateType = (type: string): string => typeTranslationMap[type] || type;
+const translateType = (type: string): string => t(`history.${type}`) || type;
+const translateSource = (source: string): string => t(`history.${source}`) || source;
 
 // Shop autocomplete from price history (loaded via ItemDetailModal's pattern)
 const shopOptions = computed(() => {
