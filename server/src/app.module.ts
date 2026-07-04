@@ -28,6 +28,7 @@ import { BudgetModule } from './modules/budget/budget.module';
 import { BackupModule } from './modules/backup/backup.module';
 import { CalendarModule } from './modules/calendar/calendar.module';
 import { ProductsModule } from './modules/products/products.module';
+import { CustomFieldsModule } from './modules/custom-fields/custom-fields.module';
 
 @Module({
   imports: [
@@ -81,6 +82,7 @@ import { ProductsModule } from './modules/products/products.module';
     HistoryModule,
     AdminModule,
     BackupModule,       // 备份/恢复
+    CustomFieldsModule, // 自定义字段
   ],
   controllers: [HealthController],
 })

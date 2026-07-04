@@ -1,8 +1,8 @@
 // ═══════════════════════════════════════════════════════
-// 系统 — 扫码/触发器、通知、插件数据
+// 系统 — 扫码/触发器、通知、插件数据、自定义字段
 // ═══════════════════════════════════════════════════════
 
-import { sqliteTable, text, integer, unique } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, real, unique, uniqueIndex } from 'drizzle-orm/sqlite-core';
 import { families, users } from './auth';
 import { mdLocations } from './master-data';
 
@@ -136,4 +136,44 @@ export const sysPluginData = sqliteTable('sys_plugin_data', {
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
 }, (table) => ({
   pluginKeyUnique: unique().on(table.pluginId, table.key),
+}));
+
+// ── 自定义字段定义 ──
+export const sysCustomFields = sqliteTable('sys_custom_fields', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  familyId: integer('family_id').notNull().references(() => families.id),
+  entityType: text('entity_type').notNull(),
+  fieldName: text('field_name').notNull(),
+  fieldLabel: text('field_label').notNull(),
+  fieldType: text('field_type', {
+    enum: ['text', 'number', 'boolean', 'date', 'select', 'multiselect'],
+  }).notNull(),
+  fieldConfig: text('field_config', { mode: 'json' }).$type<{
+    options?: { label: string; value: string }[];
+    min?: number;
+    max?: number;
+    pattern?: string;
+    placeholder?: string;
+    defaultValue?: any;
+  }>(),
+  isRequired: integer('is_required', { mode: 'boolean' }).default(false),
+  sortOrder: integer('sort_order').default(0),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
+}, (table) => ({
+  familyEntityUnique: uniqueIndex('sys_custom_fields_family_entity_unique')
+    .on(table.familyId, table.entityType, table.fieldName),
+}));
+
+// ── 自定义字段值 ──
+export const sysCustomValues = sqliteTable('sys_custom_values', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  entityType: text('entity_type').notNull(),
+  entityId: integer('entity_id').notNull(),
+  fieldId: integer('field_id').notNull().references(() => sysCustomFields.id, { onDelete: 'cascade' }),
+  value: text('value'),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
+}, (table) => ({
+  entityFieldUnique: uniqueIndex('sys_custom_values_entity_field_unique')
+    .on(table.entityType, table.entityId, table.fieldId),
 }));

@@ -19,10 +19,11 @@ export {
   hhBudgetEntries, hhBudgetCategories, hhBudgetSubscriptions,
 } from './household';
 
-// ── 系统（扫码/触发器/通知/插件） ──
+// ── 系统（扫码/触发器/通知/插件/自定义字段） ──
 export {
   sysTriggerBindings, sysNfcTagState, sysRfidReaders, sysRfidZones,
   sysAutomationTriggers, sysEncoderJobs,
   sysNotificationRules, sysNotifications,
   sysPluginData,
+  sysCustomFields, sysCustomValues,
 } from './system';

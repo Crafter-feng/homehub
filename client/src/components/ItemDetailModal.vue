@@ -23,8 +23,7 @@
 
         <!-- Tabs -->
         <n-tabs type="line" animated default-value="info" style="margin-top: 12px">
-          <n-tab-pane name="info" tab="详情">
-            <!-- 关键信息 stat 卡片 -->
+          <n-tab-pane name="info" tab="物品信息">
             <div class="stat-row">
           <div class="detail-stat">
             <span class="detail-stat-label">数量</span>
@@ -43,7 +42,6 @@
           </div>
         </div>
 
-        <!-- 详情网格 -->
         <div class="detail-grid">
           <div class="detail-section">
             <h3 class="detail-section-title">购买信息</h3>
@@ -73,32 +71,10 @@
             </div>
           </div>
         </div>
-
-        <!-- 操作历史 -->
-        <div class="history-section" v-if="history.length > 0">
-          <h3 class="detail-section-title">操作历史</h3>
-          <div class="timeline">
-            <div class="timeline-item" v-for="(record, index) in history" :key="record.id">
-              <div class="timeline-line" v-if="index < history.length - 1"></div>
-              <div class="timeline-dot" :style="{ background: getHistoryColor(record.type) }"></div>
-              <div class="timeline-content">
-                <div class="timeline-text">
-                  <span class="history-type-label">{{ record.type }}</span>
-                  <span class="history-quantity">× {{ record.quantity }}</span>
-                </div>
-                <div class="timeline-meta">
-                  <span v-if="record.source">{{ record.source }}</span>
-                  <span v-if="record.note">{{ record.note }}</span>
-                  <span>{{ formatDateTime(record.createdAt) }}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
           </n-tab-pane>
 
           <!-- 批次 Tab -->
-          <n-tab-pane name="batches" tab="批次">
+          <n-tab-pane name="batches" tab="批次信息">
             <div class="batch-section">
               <div class="batch-header">
                 <span class="batch-count">共 {{ batches.length }} 个批次</span>
@@ -126,6 +102,29 @@
                 </div>
               </div>
             </div>
+          </n-tab-pane>
+
+          <n-tab-pane name="history" tab="操作记录">
+            <div class="history-section" v-if="history.length > 0">
+              <div class="timeline">
+                <div class="timeline-item" v-for="(record, index) in history" :key="record.id">
+                  <div class="timeline-line" v-if="index < history.length - 1"></div>
+                  <div class="timeline-dot" :style="{ background: getHistoryColor(record.type) }"></div>
+                  <div class="timeline-content">
+                    <div class="timeline-text">
+                      <span class="history-type-label">{{ record.type }}</span>
+                      <span class="history-quantity">× {{ record.quantity }}</span>
+                    </div>
+                    <div class="timeline-meta">
+                      <span v-if="record.source">{{ record.source }}</span>
+                      <span v-if="record.note">{{ record.note }}</span>
+                      <span>{{ formatDateTime(record.createdAt) }}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <n-empty v-else description="暂无操作记录" />
           </n-tab-pane>
         </n-tabs>
       </div>
@@ -196,7 +195,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
 import {
-  NModal, NSpin, NButton, NSpace, NFormItem,
+  NModal, NSpin, NButton, NSpace, NFormItem, NEmpty,
   NInputNumber, NInput, NSelect, NTag, useMessage, useDialog,
 } from 'naive-ui';
 import { stockApi, locationsApi } from '@/api/client';
