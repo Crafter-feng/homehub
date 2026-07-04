@@ -5,36 +5,8 @@
     {
       "idx": 0,
       "version": "6",
-      "when": 1782741889504,
-      "tag": "0000_left_blue_shield",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "6",
-      "when": 1782742756403,
-      "tag": "0001_chilly_richard_fisk",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "6",
-      "when": 1782743600000,
-      "tag": "0002_plugin_data",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "6",
-      "when": 1782830000000,
-      "tag": "0003_documents",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "6",
-      "when": 1783000000000,
-      "tag": "0004_meal_plans",
+      "when": 1783139611198,
+      "tag": "0000_handy_cyclops",
       "breakpoints": true
     }
   ]

@@ -1,16 +1,28 @@
-export { users, families, familyMembers, apiTokens, refreshTokens } from './users';
-export { items, itemBatches, stockTransactions } from './stock';
-export { products } from './products';
-export { triggerBindings, nfcTagState, rfidReaders, rfidZones, automationTriggers, scanLogs, encoderJobs } from './trigger';
-export { locations, categories, tags, itemTags } from './locations';
-export { lists, listItems, listItemComments, holidayTemplates } from './lists';
-export { recipes } from './recipes';
-export { mealPlans, mealPlanItems } from './meal-plans';
-export { notificationRules, notifications } from './notifications';
-export { units } from './units';
-export { brands } from './brands';
-export { shops } from './shops';
-export { pluginData } from './plugins';
-export { documents } from './documents';
-export { budgetEntries, budgetCategories, budgetSubscriptions } from './budget';
-export { calendarEvents } from './calendar';
+// ═══════════════════════════════════════════════════════
+// 统一 schema 导出 — 按领域分组
+// ═══════════════════════════════════════════════════════
+
+// ── 认证 & 家庭 ──
+export { users, families, familyMembers, apiTokens, refreshTokens } from './auth';
+
+// ── 主数据 ──
+export { mdLocations, mdCategories, mdTags, mdItemTags, mdUnits, mdBrands, mdShops } from './master-data';
+
+// ── 库存（产品 + 物品 + 流水 + 文档） ──
+export { invProducts, invItems, invItemBatches, invStockTransactions, invDocuments } from './inventory';
+
+// ── 家庭生活（列表/食谱/餐计划/日历/预算） ──
+export {
+  hhLists, hhListItems, hhListItemComments, hhHolidayTemplates,
+  hhRecipes, hhMealPlans, hhMealPlanItems,
+  hhCalendarEvents,
+  hhBudgetEntries, hhBudgetCategories, hhBudgetSubscriptions,
+} from './household';
+
+// ── 系统（扫码/触发器/通知/插件） ──
+export {
+  sysTriggerBindings, sysNfcTagState, sysRfidReaders, sysRfidZones,
+  sysAutomationTriggers, sysScanLogs, sysEncoderJobs,
+  sysNotificationRules, sysNotifications,
+  sysPluginData,
+} from './system';

@@ -59,7 +59,7 @@ export class ScanEventDto {
   @IsOptional()
   metadata?: Record<string, any>;
 
-  /** Current page path of the user (e.g., "/stock/items", "/shopping") */
+  /** Current page path of the user (e.g., "/stock/invItems", "/shopping") */
   @IsString()
   @IsOptional()
   pagePath?: string;

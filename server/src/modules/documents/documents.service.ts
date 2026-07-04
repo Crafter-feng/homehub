@@ -4,7 +4,7 @@ import { eq, and } from 'drizzle-orm';
 import { Response } from 'express';
 import * as fs from 'fs';
 import { join } from 'path';
-import { documents, items } from '../../db/schema';
+import { invDocuments, invItems } from '../../db/schema';
 import { UploadMetaDto } from './dto/document.dto';
 
 @Injectable()
@@ -16,16 +16,16 @@ export class DocumentsService {
   async upload(familyId: number, file: Express.Multer.File, meta: UploadMetaDto) {
     // 如果指定了 itemId，校验物品属于当前家庭
     if (meta.itemId) {
-      const item = await this.db.select().from(items)
-        .where(and(eq(items.id, meta.itemId), eq(items.familyId, familyId)))
+      const item = await this.db.select().from(invItems)
+        .where(and(eq(invItems.id, meta.itemId), eq(invItems.familyId, familyId)))
         .get();
       if (!item) throw new NotFoundException(`物品 #${meta.itemId} 不存在或不属于当前家庭`);
     }
 
     // file.filename 由 multer diskStorage 生成，filePath 存相对路径
-    const filePath = `documents/${file.filename}`;
+    const filePath = `invDocuments/${file.filename}`;
 
-    const result = await this.db.insert(documents).values({
+    const result = await this.db.insert(invDocuments).values({
       familyId,
       itemId: meta.itemId ?? null,
       name: file.originalname,
@@ -40,18 +40,18 @@ export class DocumentsService {
 
   async list(familyId: number, itemId?: number) {
     if (itemId) {
-      return this.db.select().from(documents)
-        .where(and(eq(documents.familyId, familyId), eq(documents.itemId, itemId)))
+      return this.db.select().from(invDocuments)
+        .where(and(eq(invDocuments.familyId, familyId), eq(invDocuments.itemId, itemId)))
         .all();
     }
-    return this.db.select().from(documents)
-      .where(eq(documents.familyId, familyId))
+    return this.db.select().from(invDocuments)
+      .where(eq(invDocuments.familyId, familyId))
       .all();
   }
 
   async getById(id: number, familyId: number) {
-    const doc = await this.db.select().from(documents)
-      .where(and(eq(documents.id, id), eq(documents.familyId, familyId)))
+    const doc = await this.db.select().from(invDocuments)
+      .where(and(eq(invDocuments.id, id), eq(invDocuments.familyId, familyId)))
       .get();
     if (!doc) throw new NotFoundException(`文档 #${id} 不存在`);
     return doc;
@@ -76,7 +76,7 @@ export class DocumentsService {
       // 文件可能已被删除，忽略错误继续清理 DB 记录
     }
 
-    await this.db.delete(documents).where(eq(documents.id, id)).run();
+    await this.db.delete(invDocuments).where(eq(invDocuments.id, id)).run();
     return { success: true };
   }
 }

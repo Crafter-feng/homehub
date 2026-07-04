@@ -35,6 +35,7 @@ uploads/
 .idea/
 .workbuddy/
 .codebuddy
+.mimocode/
 *.swp
 *.swo
 

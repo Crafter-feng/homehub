@@ -1,7 +1,7 @@
 import { Injectable, Inject, NotFoundException } from '@nestjs/common';
 import { DATABASE_TOKEN } from '../../../db/database.module';
 import { eq, and } from 'drizzle-orm';
-import { brands } from '../../../db/schema';
+import { mdBrands } from '../../../db/schema';
 
 @Injectable()
 export class BrandsService {
@@ -10,13 +10,13 @@ export class BrandsService {
   ) {}
 
   async list(familyId: number) {
-    return this.db.select().from(brands)
-      .where(eq(brands.familyId, familyId))
+    return this.db.select().from(mdBrands)
+      .where(eq(mdBrands.familyId, familyId))
       .all();
   }
 
   async create(familyId: number, data: { name: string; notes?: string }) {
-    return this.db.insert(brands).values({
+    return this.db.insert(mdBrands).values({
       familyId,
       name: data.name,
       notes: data.notes,
@@ -24,8 +24,8 @@ export class BrandsService {
   }
 
   async update(brandId: number, familyId: number, data: { name?: string; notes?: string }) {
-    const brand = await this.db.select().from(brands)
-      .where(and(eq(brands.id, brandId), eq(brands.familyId, familyId)))
+    const brand = await this.db.select().from(mdBrands)
+      .where(and(eq(mdBrands.id, brandId), eq(mdBrands.familyId, familyId)))
       .get();
     if (!brand) throw new NotFoundException('品牌不存在');
 
@@ -33,13 +33,13 @@ export class BrandsService {
     if (data.name) updates.name = data.name;
     if (data.notes !== undefined) updates.notes = data.notes;
 
-    await this.db.update(brands).set(updates).where(eq(brands.id, brandId)).run();
-    return this.db.select().from(brands).where(eq(brands.id, brandId)).get();
+    await this.db.update(mdBrands).set(updates).where(eq(mdBrands.id, brandId)).run();
+    return this.db.select().from(mdBrands).where(eq(mdBrands.id, brandId)).get();
   }
 
   async delete(brandId: number, familyId: number) {
-    await this.db.delete(brands)
-      .where(and(eq(brands.id, brandId), eq(brands.familyId, familyId)))
+    await this.db.delete(mdBrands)
+      .where(and(eq(mdBrands.id, brandId), eq(mdBrands.familyId, familyId)))
       .run();
     return { success: true };
   }

@@ -18,10 +18,12 @@
     "db:generate": "npm run db:generate -w server",
     "db:migrate": "npm run db:migrate -w server",
     "db:seed": "npm run db:seed -w server",
+    "migrate:grocy": "npm run migrate:grocy -w server",
     "docker:up": "docker compose -f docker/docker-compose.yml up -d",
     "docker:down": "docker compose -f docker/docker-compose.yml down"
   },
   "devDependencies": {
+    "@vitest/coverage-v8": "^3.2.6",
     "concurrently": "^9.1.0",
     "playwright": "^1.61.1"
   }

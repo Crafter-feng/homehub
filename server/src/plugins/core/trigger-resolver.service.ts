@@ -143,7 +143,7 @@ export class TriggerResolverService {
       return {
         primary: 'open_page',
         params: {
-          pageUrl: `/stock/items/${binding.targetId}`,
+          pageUrl: `/stock/invItems/${binding.targetId}`,
           itemId: binding.targetId,
           quickAdd: true,
         },

@@ -15,7 +15,7 @@ export class StockController {
   constructor(private readonly stockService: StockService) {}
 
   @Get('items')
-  listItems(
+  hhListItems(
     @Request() req: AuthedRequest,
     @Query('category') category?: string,
     @Query('location') location?: string,
@@ -128,9 +128,9 @@ export class StockController {
   }
 
   @Post('import')
-  async importCsv(@Request() req: AuthedRequest, @Body() body: { items: Array<Partial<CreateItemDto>> }) {
+  async importCsv(@Request() req: AuthedRequest, @Body() body: { invItems: Array<Partial<CreateItemDto>> }) {
     const results = [];
-    for (const item of (body.items || [])) {
+    for (const item of (body.invItems || [])) {
       try {
         const created = await this.stockService.create(req.user.familyId, item as CreateItemDto, req.user.id);
         results.push({ success: true, item: created });

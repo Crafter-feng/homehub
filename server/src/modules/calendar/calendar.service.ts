@@ -1,7 +1,7 @@
 import { Injectable, Inject, NotFoundException } from '@nestjs/common';
 import { DATABASE_TOKEN } from '../../db/database.module';
 import { eq, and, gte, lte, sql } from 'drizzle-orm';
-import { calendarEvents } from '../../db/schema/calendar';
+import { hhCalendarEvents } from '../../db/schema';
 import { CreateCalendarEventDto, UpdateCalendarEventDto } from './dto/calendar-event.dto';
 
 @Injectable()
@@ -11,31 +11,31 @@ export class CalendarService {
   ) {}
 
   async list(familyId: number, startDate?: string, endDate?: string) {
-    let condition = eq(calendarEvents.familyId, familyId);
+    let condition = eq(hhCalendarEvents.familyId, familyId);
     if (startDate && endDate) {
-      condition = and(condition, gte(calendarEvents.date, startDate), lte(calendarEvents.date, endDate))!;
+      condition = and(condition, gte(hhCalendarEvents.date, startDate), lte(hhCalendarEvents.date, endDate))!;
     } else if (startDate) {
-      condition = and(condition, gte(calendarEvents.date, startDate))!;
+      condition = and(condition, gte(hhCalendarEvents.date, startDate))!;
     } else if (endDate) {
-      condition = and(condition, lte(calendarEvents.date, endDate))!;
+      condition = and(condition, lte(hhCalendarEvents.date, endDate))!;
     }
 
-    return this.db.select().from(calendarEvents)
+    return this.db.select().from(hhCalendarEvents)
       .where(condition)
-      .orderBy(calendarEvents.date)
+      .orderBy(hhCalendarEvents.date)
       .all();
   }
 
   async getById(id: number, familyId: number) {
-    const event = await this.db.select().from(calendarEvents)
-      .where(and(eq(calendarEvents.id, id), eq(calendarEvents.familyId, familyId)))
+    const event = await this.db.select().from(hhCalendarEvents)
+      .where(and(eq(hhCalendarEvents.id, id), eq(hhCalendarEvents.familyId, familyId)))
       .get();
     if (!event) throw new NotFoundException('事件不存在');
     return event;
   }
 
   async create(familyId: number, dto: CreateCalendarEventDto) {
-    return this.db.insert(calendarEvents).values({
+    return this.db.insert(hhCalendarEvents).values({
       familyId,
       title: dto.title,
       description: dto.description,
@@ -64,13 +64,13 @@ export class CalendarService {
     if (dto.recurrence) updates.recurrence = dto.recurrence;
     if (dto.reminderMinutes !== undefined) updates.reminderMinutes = dto.reminderMinutes;
 
-    await this.db.update(calendarEvents).set(updates).where(eq(calendarEvents.id, id)).run();
+    await this.db.update(hhCalendarEvents).set(updates).where(eq(hhCalendarEvents.id, id)).run();
     return this.getById(id, familyId);
   }
 
   async delete(id: number, familyId: number) {
     await this.getById(id, familyId);
-    await this.db.delete(calendarEvents).where(eq(calendarEvents.id, id)).run();
+    await this.db.delete(hhCalendarEvents).where(eq(hhCalendarEvents.id, id)).run();
     return { deleted: true };
   }
 }

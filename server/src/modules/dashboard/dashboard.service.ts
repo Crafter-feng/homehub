@@ -1,7 +1,7 @@
 import { Injectable, Inject } from '@nestjs/common';
 import { DATABASE_TOKEN } from '../../db/database.module';
 import { eq, and, desc, sql, like, gte, lte } from 'drizzle-orm';
-import { stockTransactions, items, lists, listItems, scanLogs, automationTriggers, categories } from '../../db/schema';
+import { invStockTransactions, invItems, hhLists, hhListItems, sysScanLogs, sysAutomationTriggers, mdCategories } from '../../db/schema';
 
 @Injectable()
 export class DashboardService {
@@ -14,18 +14,18 @@ export class DashboardService {
 
     // 库存变动记录
     const stockChanges = await this.db.select({
-      id: stockTransactions.id,
-      type: stockTransactions.type,
-      quantity: stockTransactions.quantity,
-      unit: stockTransactions.unit,
-      note: stockTransactions.note,
-      source: stockTransactions.source,
-      createdAt: stockTransactions.createdAt,
-      itemName: items.name,
-    }).from(stockTransactions)
-      .innerJoin(items, eq(stockTransactions.itemId, items.id))
-      .where(eq(items.familyId, familyId))
-      .orderBy(desc(stockTransactions.createdAt))
+      id: invStockTransactions.id,
+      type: invStockTransactions.type,
+      quantity: invStockTransactions.quantity,
+      unit: invStockTransactions.unit,
+      note: invStockTransactions.note,
+      source: invStockTransactions.source,
+      createdAt: invStockTransactions.createdAt,
+      itemName: invItems.name,
+    }).from(invStockTransactions)
+      .innerJoin(invItems, eq(invStockTransactions.itemId, invItems.id))
+      .where(eq(invItems.familyId, familyId))
+      .orderBy(desc(invStockTransactions.createdAt))
       .limit(limit);
 
     for (const tx of stockChanges) {
@@ -42,18 +42,18 @@ export class DashboardService {
 
     // 清单条目完成记录
     const completedItems = await this.db.select({
-      id: listItems.id,
-      content: listItems.content,
-      completedAt: listItems.completedAt,
-      listName: lists.name,
-      listType: lists.type,
-    }).from(listItems)
-      .innerJoin(lists, eq(listItems.listId, lists.id))
+      id: hhListItems.id,
+      content: hhListItems.content,
+      completedAt: hhListItems.completedAt,
+      listName: hhLists.name,
+      listType: hhLists.type,
+    }).from(hhListItems)
+      .innerJoin(hhLists, eq(hhListItems.listId, hhLists.id))
       .where(and(
-        eq(lists.familyId, familyId),
-        eq(listItems.status, 'completed'),
+        eq(hhLists.familyId, familyId),
+        eq(hhListItems.status, 'completed'),
       ))
-      .orderBy(desc(listItems.completedAt))
+      .orderBy(desc(hhListItems.completedAt))
       .limit(limit);
 
     for (const item of completedItems) {
@@ -69,14 +69,14 @@ export class DashboardService {
 
     // 扫描记录
     const scans = await this.db.select({
-      id: scanLogs.id,
-      scanType: scanLogs.scanType,
-      code: scanLogs.code,
-      action: scanLogs.action,
-      createdAt: scanLogs.createdAt,
-    }).from(scanLogs)
-      .where(eq(scanLogs.familyId, familyId))
-      .orderBy(desc(scanLogs.createdAt))
+      id: sysScanLogs.id,
+      scanType: sysScanLogs.scanType,
+      code: sysScanLogs.code,
+      action: sysScanLogs.action,
+      createdAt: sysScanLogs.createdAt,
+    }).from(sysScanLogs)
+      .where(eq(sysScanLogs.familyId, familyId))
+      .orderBy(desc(sysScanLogs.createdAt))
       .limit(limit);
 
     for (const scan of scans) {
@@ -101,19 +101,19 @@ export class DashboardService {
 
   async getStockSummary(familyId: number) {
     const total = await this.db.select({ count: sql<number>`count(*)` })
-      .from(items).where(eq(items.familyId, familyId)).get();
+      .from(invItems).where(eq(invItems.familyId, familyId)).get();
 
     const expiring = await this.db.select({ count: sql<number>`count(*)` })
-      .from(items).where(and(
-        eq(items.familyId, familyId),
-        sql`${items.expiryDate} <= ${Date.now() + 7 * 86400000}`,
-        sql`${items.expiryDate} > ${Date.now()}`,
+      .from(invItems).where(and(
+        eq(invItems.familyId, familyId),
+        sql`${invItems.expiryDate} <= ${Date.now() + 7 * 86400000}`,
+        sql`${invItems.expiryDate} > ${Date.now()}`,
       )).get();
 
     const expired = await this.db.select({ count: sql<number>`count(*)` })
-      .from(items).where(and(
-        eq(items.familyId, familyId),
-        sql`${items.expiryDate} <= ${Date.now()}`,
+      .from(invItems).where(and(
+        eq(invItems.familyId, familyId),
+        sql`${invItems.expiryDate} <= ${Date.now()}`,
       )).get();
 
     // 本月消耗
@@ -122,21 +122,21 @@ export class DashboardService {
     monthStart.setHours(0, 0, 0, 0);
 
     const monthConsumption = await this.db.select({ count: sql<number>`count(*)` })
-      .from(stockTransactions)
-      .innerJoin(items, eq(stockTransactions.itemId, items.id))
+      .from(invStockTransactions)
+      .innerJoin(invItems, eq(invStockTransactions.itemId, invItems.id))
       .where(and(
-        eq(items.familyId, familyId),
-        eq(stockTransactions.type, 'consume'),
-        sql`${stockTransactions.createdAt} >= ${monthStart.getTime()}`,
+        eq(invItems.familyId, familyId),
+        eq(invStockTransactions.type, 'consume'),
+        sql`${invStockTransactions.createdAt} >= ${monthStart.getTime()}`,
       )).get();
 
     // 待办任务
     const pendingTasks = await this.db.select({ count: sql<number>`count(*)` })
-      .from(listItems)
-      .innerJoin(lists, eq(listItems.listId, lists.id))
+      .from(hhListItems)
+      .innerJoin(hhLists, eq(hhListItems.listId, hhLists.id))
       .where(and(
-        eq(lists.familyId, familyId),
-        eq(listItems.status, 'pending'),
+        eq(hhLists.familyId, familyId),
+        eq(hhListItems.status, 'pending'),
       )).get();
 
     return {
@@ -154,28 +154,28 @@ export class DashboardService {
 
     // Build LIKE conditions for waste notes
     const wasteConditions = wasteKeywords.map(keyword =>
-      like(stockTransactions.note, `%${keyword}%`)
+      like(invStockTransactions.note, `%${keyword}%`)
     );
 
     // Fetch waste transactions: type='consume' with waste-indicating notes
     const wasteTxs = await this.db.select({
-      id: stockTransactions.id,
-      quantity: stockTransactions.quantity,
-      unit: stockTransactions.unit,
-      note: stockTransactions.note,
-      createdAt: stockTransactions.createdAt,
-      itemId: stockTransactions.itemId,
-      itemName: items.name,
-      purchasePrice: items.purchasePrice,
-      categoryId: items.categoryId,
-    }).from(stockTransactions)
-      .innerJoin(items, eq(stockTransactions.itemId, items.id))
+      id: invStockTransactions.id,
+      quantity: invStockTransactions.quantity,
+      unit: invStockTransactions.unit,
+      note: invStockTransactions.note,
+      createdAt: invStockTransactions.createdAt,
+      itemId: invStockTransactions.itemId,
+      itemName: invItems.name,
+      purchasePrice: invItems.purchasePrice,
+      categoryId: invItems.categoryId,
+    }).from(invStockTransactions)
+      .innerJoin(invItems, eq(invStockTransactions.itemId, invItems.id))
       .where(and(
-        eq(items.familyId, familyId),
-        eq(stockTransactions.type, 'consume'),
+        eq(invItems.familyId, familyId),
+        eq(invStockTransactions.type, 'consume'),
         ...wasteConditions,
       ))
-      .orderBy(desc(stockTransactions.createdAt));
+      .orderBy(desc(invStockTransactions.createdAt));
 
     // totalWasted: sum of quantity
     const totalWasted = wasteTxs.reduce((sum: number, tx: any) => sum + Math.abs(tx.quantity), 0);
@@ -187,10 +187,10 @@ export class DashboardService {
     let categoryMap: Record<number, string> = {};
     if (categoryIds.length > 0) {
       const cats: any[] = await this.db.select({
-        id: categories.id,
-        name: categories.name,
-      }).from(categories)
-        .where(sql`${categories.id} IN (${sql.raw(categoryIds.join(','))})`)
+        id: mdCategories.id,
+        name: mdCategories.name,
+      }).from(mdCategories)
+        .where(sql`${mdCategories.id} IN (${sql.raw(categoryIds.join(','))})`)
         .all();
       for (const c of cats) {
         categoryMap[c.id] = c.name;
@@ -235,7 +235,7 @@ export class DashboardService {
         unit: data.unit,
       }));
 
-    // estimatedLoss: total purchasePrice of wasted items
+    // estimatedLoss: total purchasePrice of wasted invItems
     const estimatedLoss = wasteTxs.reduce((sum: number, tx: any) => {
       const price = tx.purchasePrice || 0;
       const qty = Math.abs(tx.quantity);

@@ -1,7 +1,7 @@
 import { Injectable, Inject, NotFoundException } from '@nestjs/common';
 import { DATABASE_TOKEN } from '../../db/database.module';
 import { eq, and, sql } from 'drizzle-orm';
-import { recipes, items } from '../../db/schema';
+import { hhRecipes, invItems } from '../../db/schema';
 import { CreateRecipeDto, UpdateRecipeDto, CreateMealPlanDto, AddMealPlanItemDto } from './dto/recipe.dto';
 
 @Injectable()
@@ -13,27 +13,27 @@ export class RecipesService {
   async list(familyId: number, query?: string) {
     if (query) {
       const searchPattern = `%${query}%`;
-      return this.db.select().from(recipes)
+      return this.db.select().from(hhRecipes)
         .where(and(
-          eq(recipes.familyId, familyId),
-          sql`${recipes.name} LIKE ${searchPattern}`,
+          eq(hhRecipes.familyId, familyId),
+          sql`${hhRecipes.name} LIKE ${searchPattern}`,
         )).all();
     }
-    return this.db.select().from(recipes)
-      .where(eq(recipes.familyId, familyId))
+    return this.db.select().from(hhRecipes)
+      .where(eq(hhRecipes.familyId, familyId))
       .all();
   }
 
   async getById(recipeId: number) {
-    const recipe = await this.db.select().from(recipes)
-      .where(eq(recipes.id, recipeId))
+    const recipe = await this.db.select().from(hhRecipes)
+      .where(eq(hhRecipes.id, recipeId))
       .get();
     if (!recipe) throw new NotFoundException('食谱不存在');
     return recipe;
   }
 
   async create(familyId: number, dto: CreateRecipeDto) {
-    return this.db.insert(recipes).values({
+    return this.db.insert(hhRecipes).values({
       familyId,
       name: dto.name,
       description: dto.description,
@@ -48,12 +48,12 @@ export class RecipesService {
   }
 
   async update(recipeId: number, familyId: number, dto: UpdateRecipeDto) {
-    const recipe = await this.db.select().from(recipes)
-      .where(and(eq(recipes.id, recipeId), eq(recipes.familyId, familyId)))
+    const recipe = await this.db.select().from(hhRecipes)
+      .where(and(eq(hhRecipes.id, recipeId), eq(hhRecipes.familyId, familyId)))
       .get();
     if (!recipe) throw new NotFoundException('食谱不存在');
 
-    await this.db.update(recipes).set({
+    await this.db.update(hhRecipes).set({
       name: dto.name,
       description: dto.description,
       ingredients: dto.ingredients,
@@ -63,30 +63,30 @@ export class RecipesService {
       servings: dto.servings,
       image: dto.image,
       source: dto.source,
-    }).where(eq(recipes.id, recipeId)).run();
+    }).where(eq(hhRecipes.id, recipeId)).run();
 
     return this.getById(recipeId);
   }
 
   async delete(recipeId: number, familyId: number) {
-    await this.db.delete(recipes)
-      .where(and(eq(recipes.id, recipeId), eq(recipes.familyId, familyId)))
+    await this.db.delete(hhRecipes)
+      .where(and(eq(hhRecipes.id, recipeId), eq(hhRecipes.familyId, familyId)))
       .run();
     return { success: true };
   }
 
   async getRecommendations(familyId: number, limit: number = 5) {
     // 获取家庭库存的物品名称
-    const stockItems = await this.db.select({ name: items.name })
-      .from(items)
-      .where(eq(items.familyId, familyId))
+    const stockItems = await this.db.select({ name: invItems.name })
+      .from(invItems)
+      .where(eq(invItems.familyId, familyId))
       .all();
 
     const stockNames = stockItems.map((i: any) => i.name.toLowerCase());
 
     // 获取所有食谱
-    const allRecipes = await this.db.select().from(recipes)
-      .where(eq(recipes.familyId, familyId))
+    const allRecipes = await this.db.select().from(hhRecipes)
+      .where(eq(hhRecipes.familyId, familyId))
       .all();
 
     // 计算匹配度
@@ -105,18 +105,18 @@ export class RecipesService {
   }
 
   /**
-   * Export all recipes for a family as JSON (Grocy-compatible format).
+   * Export all hhRecipes for a family as JSON (Grocy-compatible format).
    */
   async exportRecipes(familyId: number) {
-    const allRecipes = await this.db.select().from(recipes)
-      .where(eq(recipes.familyId, familyId))
+    const allRecipes = await this.db.select().from(hhRecipes)
+      .where(eq(hhRecipes.familyId, familyId))
       .all();
 
     return {
       format: 'homehub-recipe-export',
       version: 1,
       exportedAt: new Date().toISOString(),
-      recipes: allRecipes.map((r: any) => ({
+      hhRecipes: allRecipes.map((r: any) => ({
         name: r.name,
         description: r.description || '',
         ingredients: r.ingredients || [],
@@ -132,23 +132,23 @@ export class RecipesService {
   }
 
   /**
-   * Import recipes from JSON (compatible with Grocy format).
+   * Import hhRecipes from JSON (compatible with Grocy format).
    *
    * Accepted format:
-   * { recipes: [{ name, description, ingredients, steps, prepTime, cookTime, servings, image, source }] }
+   * { hhRecipes: [{ name, description, ingredients, steps, prepTime, cookTime, servings, image, source }] }
    * or Grocy format: array of { name, description, ingredients: [...], ... }
    */
   async importRecipes(familyId: number, data: any) {
     let recipeList: any[] = [];
 
     if (Array.isArray(data)) {
-      // Grocy-compatible: plain array of recipes
+      // Grocy-compatible: plain array of hhRecipes
       recipeList = data;
-    } else if (data.recipes && Array.isArray(data.recipes)) {
+    } else if (data.hhRecipes && Array.isArray(data.hhRecipes)) {
       // HomeHub export format
-      recipeList = data.recipes;
+      recipeList = data.hhRecipes;
     } else {
-      throw new Error('不支持的导入格式 — 需要 recipes 数组或 HomeHub/Grocy 导出格式');
+      throw new Error('不支持的导入格式 — 需要 hhRecipes 数组或 HomeHub/Grocy 导出格式');
     }
 
     const results: { name: string; success: boolean; id?: number; error?: string }[] = [];
@@ -179,7 +179,7 @@ export class RecipesService {
             }))
           : [];
 
-        const result = await this.db.insert(recipes).values({
+        const result = await this.db.insert(hhRecipes).values({
           familyId,
           name: item.name,
           description: item.description || '',

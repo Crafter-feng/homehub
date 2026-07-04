@@ -1,7 +1,7 @@
 import { Injectable, Inject, NotFoundException } from '@nestjs/common';
 import { DATABASE_TOKEN } from '../../db/database.module';
 import { eq, and } from 'drizzle-orm';
-import { rfidReaders, rfidZones } from '../../db/schema';
+import { sysRfidReaders, sysRfidZones } from '../../db/schema';
 import { CreateReaderDto, UpdateReaderDto, CreateZoneDto, UpdateZoneDto } from './dto/iot-tag.dto';
 
 @Injectable()
@@ -13,21 +13,21 @@ export class IotTagsService {
   // === Reader CRUD ===
 
   async listReaders(familyId: number) {
-    return this.db.select().from(rfidReaders)
-      .where(eq(rfidReaders.familyId, familyId))
+    return this.db.select().from(sysRfidReaders)
+      .where(eq(sysRfidReaders.familyId, familyId))
       .all();
   }
 
   async getReaderById(id: number) {
-    const reader = await this.db.select().from(rfidReaders)
-      .where(eq(rfidReaders.id, id))
+    const reader = await this.db.select().from(sysRfidReaders)
+      .where(eq(sysRfidReaders.id, id))
       .get();
     if (!reader) throw new NotFoundException(`RFID Reader #${id} 不存在`);
     return reader;
   }
 
   async createReader(familyId: number, dto: CreateReaderDto) {
-    return this.db.insert(rfidReaders).values({
+    return this.db.insert(sysRfidReaders).values({
       familyId,
       name: dto.name,
       locationId: dto.locationId ?? null,
@@ -39,8 +39,8 @@ export class IotTagsService {
   }
 
   async updateReader(id: number, familyId: number, dto: UpdateReaderDto) {
-    const reader = await this.db.select().from(rfidReaders)
-      .where(and(eq(rfidReaders.id, id), eq(rfidReaders.familyId, familyId)))
+    const reader = await this.db.select().from(sysRfidReaders)
+      .where(and(eq(sysRfidReaders.id, id), eq(sysRfidReaders.familyId, familyId)))
       .get();
     if (!reader) throw new NotFoundException(`RFID Reader #${id} 不存在`);
 
@@ -50,32 +50,32 @@ export class IotTagsService {
     if (dto.readerType !== undefined) updates.readerType = dto.readerType;
     if (dto.config !== undefined) updates.config = dto.config;
 
-    await this.db.update(rfidReaders).set(updates).where(eq(rfidReaders.id, id)).run();
+    await this.db.update(sysRfidReaders).set(updates).where(eq(sysRfidReaders.id, id)).run();
     return this.getReaderById(id);
   }
 
   async deleteReader(id: number, familyId: number) {
-    const reader = await this.db.select().from(rfidReaders)
-      .where(and(eq(rfidReaders.id, id), eq(rfidReaders.familyId, familyId)))
+    const reader = await this.db.select().from(sysRfidReaders)
+      .where(and(eq(sysRfidReaders.id, id), eq(sysRfidReaders.familyId, familyId)))
       .get();
     if (!reader) throw new NotFoundException(`RFID Reader #${id} 不存在`);
 
     // 删除关联的 zones
-    await this.db.delete(rfidZones).where(eq(rfidZones.readerId, id)).run();
+    await this.db.delete(sysRfidZones).where(eq(sysRfidZones.readerId, id)).run();
     // 删除 reader
-    await this.db.delete(rfidReaders).where(eq(rfidReaders.id, id)).run();
+    await this.db.delete(sysRfidReaders).where(eq(sysRfidReaders.id, id)).run();
     return { success: true };
   }
 
   async heartbeat(id: number, familyId: number) {
-    const reader = await this.db.select().from(rfidReaders)
-      .where(and(eq(rfidReaders.id, id), eq(rfidReaders.familyId, familyId)))
+    const reader = await this.db.select().from(sysRfidReaders)
+      .where(and(eq(sysRfidReaders.id, id), eq(sysRfidReaders.familyId, familyId)))
       .get();
     if (!reader) throw new NotFoundException(`RFID Reader #${id} 不存在`);
 
-    await this.db.update(rfidReaders)
+    await this.db.update(sysRfidReaders)
       .set({ lastOnlineAt: new Date() })
-      .where(eq(rfidReaders.id, id))
+      .where(eq(sysRfidReaders.id, id))
       .run();
     return this.getReaderById(id);
   }
@@ -85,8 +85,8 @@ export class IotTagsService {
 
   async listZones(familyId: number, readerId?: number) {
     // 先查出当前家庭的所有 reader IDs
-    const readers = await this.db.select({ id: rfidReaders.id }).from(rfidReaders)
-      .where(eq(rfidReaders.familyId, familyId))
+    const readers = await this.db.select({ id: sysRfidReaders.id }).from(sysRfidReaders)
+      .where(eq(sysRfidReaders.familyId, familyId))
       .all();
     const readerIds = readers.map((r: any) => r.id);
 
@@ -95,16 +95,16 @@ export class IotTagsService {
     if (readerId) {
       // 如果指定了 readerId，校验它属于该家庭
       if (!readerIds.includes(readerId)) return [];
-      return this.db.select().from(rfidZones)
-        .where(eq(rfidZones.readerId, readerId))
+      return this.db.select().from(sysRfidZones)
+        .where(eq(sysRfidZones.readerId, readerId))
         .all();
     }
 
     // 返回该家庭所有 readers 下的 zones
     const zones: any[] = [];
     for (const rid of readerIds) {
-      const rZones = await this.db.select().from(rfidZones)
-        .where(eq(rfidZones.readerId, rid))
+      const rZones = await this.db.select().from(sysRfidZones)
+        .where(eq(sysRfidZones.readerId, rid))
         .all();
       zones.push(...rZones);
     }
@@ -112,8 +112,8 @@ export class IotTagsService {
   }
 
   async getZoneById(id: number) {
-    const zone = await this.db.select().from(rfidZones)
-      .where(eq(rfidZones.id, id))
+    const zone = await this.db.select().from(sysRfidZones)
+      .where(eq(sysRfidZones.id, id))
       .get();
     if (!zone) throw new NotFoundException(`RFID Zone #${id} 不存在`);
     return zone;
@@ -121,12 +121,12 @@ export class IotTagsService {
 
   async createZone(familyId: number, dto: CreateZoneDto) {
     // 校验 readerId 属于当前家庭
-    const reader = await this.db.select().from(rfidReaders)
-      .where(and(eq(rfidReaders.id, dto.readerId), eq(rfidReaders.familyId, familyId)))
+    const reader = await this.db.select().from(sysRfidReaders)
+      .where(and(eq(sysRfidReaders.id, dto.readerId), eq(sysRfidReaders.familyId, familyId)))
       .get();
     if (!reader) throw new NotFoundException(`RFID Reader #${dto.readerId} 不存在或不属于当前家庭`);
 
-    return this.db.insert(rfidZones).values({
+    return this.db.insert(sysRfidZones).values({
       readerId: dto.readerId,
       tagPattern: dto.tagPattern ?? null,
       locationId: dto.locationId ?? null,
@@ -136,13 +136,13 @@ export class IotTagsService {
 
   async updateZone(id: number, familyId: number, dto: UpdateZoneDto) {
     // 先查 zone，再通过 readerId 校验家庭归属
-    const zone = await this.db.select().from(rfidZones)
-      .where(eq(rfidZones.id, id))
+    const zone = await this.db.select().from(sysRfidZones)
+      .where(eq(sysRfidZones.id, id))
       .get();
     if (!zone) throw new NotFoundException(`RFID Zone #${id} 不存在`);
 
-    const reader = await this.db.select().from(rfidReaders)
-      .where(and(eq(rfidReaders.id, zone.readerId), eq(rfidReaders.familyId, familyId)))
+    const reader = await this.db.select().from(sysRfidReaders)
+      .where(and(eq(sysRfidReaders.id, zone.readerId), eq(sysRfidReaders.familyId, familyId)))
       .get();
     if (!reader) throw new NotFoundException(`RFID Zone #${id} 不属于当前家庭`);
 
@@ -151,22 +151,22 @@ export class IotTagsService {
     if (dto.locationId !== undefined) updates.locationId = dto.locationId;
     if (dto.notes !== undefined) updates.notes = dto.notes;
 
-    await this.db.update(rfidZones).set(updates).where(eq(rfidZones.id, id)).run();
+    await this.db.update(sysRfidZones).set(updates).where(eq(sysRfidZones.id, id)).run();
     return this.getZoneById(id);
   }
 
   async deleteZone(id: number, familyId: number) {
-    const zone = await this.db.select().from(rfidZones)
-      .where(eq(rfidZones.id, id))
+    const zone = await this.db.select().from(sysRfidZones)
+      .where(eq(sysRfidZones.id, id))
       .get();
     if (!zone) throw new NotFoundException(`RFID Zone #${id} 不存在`);
 
-    const reader = await this.db.select().from(rfidReaders)
-      .where(and(eq(rfidReaders.id, zone.readerId), eq(rfidReaders.familyId, familyId)))
+    const reader = await this.db.select().from(sysRfidReaders)
+      .where(and(eq(sysRfidReaders.id, zone.readerId), eq(sysRfidReaders.familyId, familyId)))
       .get();
     if (!reader) throw new NotFoundException(`RFID Zone #${id} 不属于当前家庭`);
 
-    await this.db.delete(rfidZones).where(eq(rfidZones.id, id)).run();
+    await this.db.delete(sysRfidZones).where(eq(sysRfidZones.id, id)).run();
     return { success: true };
   }
 }

@@ -69,7 +69,7 @@ export class McpService {
    *
    * Flow:
    * 1. Extract path parameters from apiPath template (e.g., {item_id} from
-   *    /v1/stock/items/{item_id}/consume) and replace with actual values from params.
+   *    /v1/stock/invItems/{item_id}/consume) and replace with actual values from params.
    * 2. Separate path params from body/query params.
    * 3. Dispatch to the appropriate internal Service based on resolved path prefix.
    *
@@ -133,11 +133,11 @@ export class McpService {
       return this.dispatchStock(method, resolvedPath, params, familyId, userId);
     }
     // ── Lists ──
-    if (resolvedPath.startsWith('/v1/lists/') || resolvedPath === '/v1/lists') {
+    if (resolvedPath.startsWith('/v1/hhLists/') || resolvedPath === '/v1/hhLists') {
       return this.dispatchLists(method, resolvedPath, params, familyId, userId);
     }
     // ── Recipes ──
-    if (resolvedPath.startsWith('/v1/recipes/')) {
+    if (resolvedPath.startsWith('/v1/hhRecipes/')) {
       return this.dispatchRecipes(method, resolvedPath, params, familyId, userId);
     }
     // ── Meal Plans ──
@@ -157,32 +157,32 @@ export class McpService {
       return this.dispatchScanner(method, resolvedPath, params, familyId, userId);
     }
     // ── Locations ──
-    if (resolvedPath.startsWith('/v1/locations')) {
+    if (resolvedPath.startsWith('/v1/mdLocations')) {
       return this.dispatchLocations(method, resolvedPath, params, familyId, userId);
     }
     // ── Categories ──
-    if (resolvedPath.startsWith('/v1/categories')) {
+    if (resolvedPath.startsWith('/v1/mdCategories')) {
       return this.dispatchCategories(method, resolvedPath, params, familyId, userId);
     }
     // ── Tags / Brands / Units (read-only) ──
-    if (resolvedPath.startsWith('/v1/tags') && method === 'GET') {
+    if (resolvedPath.startsWith('/v1/mdTags') && method === 'GET') {
       // TODO: inject TagsService when available
-      return { tags: [] };
+      return { mdTags: [] };
     }
-    if (resolvedPath.startsWith('/v1/brands') && method === 'GET') {
+    if (resolvedPath.startsWith('/v1/mdBrands') && method === 'GET') {
       // TODO: inject BrandsService when available
-      return { brands: [] };
+      return { mdBrands: [] };
     }
-    if (resolvedPath.startsWith('/v1/units') && method === 'GET') {
+    if (resolvedPath.startsWith('/v1/mdUnits') && method === 'GET') {
       // TODO: inject UnitsService when available
-      return { units: [] };
+      return { mdUnits: [] };
     }
     // ── Dashboard ──
     if (resolvedPath.startsWith('/v1/dashboard/')) {
       return this.dispatchDashboard(method, resolvedPath, params, familyId, userId);
     }
     // ── Notifications ──
-    if (resolvedPath.startsWith('/v1/notifications')) {
+    if (resolvedPath.startsWith('/v1/sysNotifications')) {
       return this.dispatchNotifications(method, resolvedPath, params, familyId, userId);
     }
     // ── History ──
@@ -205,8 +205,8 @@ export class McpService {
     familyId: number,
     userId: number,
   ): Promise<any> {
-    // GET /v1/stock/items → search_items
-    if (resolvedPath === '/v1/stock/items' && method === 'GET') {
+    // GET /v1/stock/invItems → search_items
+    if (resolvedPath === '/v1/stock/invItems' && method === 'GET') {
       if (params.query) {
         return this.stockService.search(familyId, params.query, {
           page: 1,
@@ -223,8 +223,8 @@ export class McpService {
       });
     }
 
-    // POST /v1/stock/items → add_item
-    if (resolvedPath === '/v1/stock/items' && method === 'POST') {
+    // POST /v1/stock/invItems → add_item
+    if (resolvedPath === '/v1/stock/invItems' && method === 'POST') {
       return this.stockService.create(familyId, {
         name: params.name,
         type: params.type || 'generic',
@@ -237,15 +237,15 @@ export class McpService {
       }, userId);
     }
 
-    // GET /v1/stock/items/{id} → get_item
-    const getItemMatch = resolvedPath.match(/^\/v1\/stock\/items\/(\d+)$/);
+    // GET /v1/stock/invItems/{id} → get_item
+    const getItemMatch = resolvedPath.match(/^\/v1\/stock\/invItems\/(\d+)$/);
     if (getItemMatch && method === 'GET') {
       const itemId = parseInt(getItemMatch[1], 10);
       return this.stockService.getById(itemId);
     }
 
-    // PUT /v1/stock/items/{id} → update_item
-    const updateMatch = resolvedPath.match(/^\/v1\/stock\/items\/(\d+)$/);
+    // PUT /v1/stock/invItems/{id} → update_item
+    const updateMatch = resolvedPath.match(/^\/v1\/stock\/invItems\/(\d+)$/);
     if (updateMatch && method === 'PUT') {
       const itemId = parseInt(updateMatch[1], 10);
       return this.stockService.update(itemId, familyId, {
@@ -256,15 +256,15 @@ export class McpService {
       });
     }
 
-    // DELETE /v1/stock/items/{id} → delete_item
-    const deleteMatch = resolvedPath.match(/^\/v1\/stock\/items\/(\d+)$/);
+    // DELETE /v1/stock/invItems/{id} → delete_item
+    const deleteMatch = resolvedPath.match(/^\/v1\/stock\/invItems\/(\d+)$/);
     if (deleteMatch && method === 'DELETE') {
       const itemId = parseInt(deleteMatch[1], 10);
       return this.stockService.delete(itemId, familyId);
     }
 
-    // POST /v1/stock/items/{id}/consume → consume_item
-    const consumeMatch = resolvedPath.match(/^\/v1\/stock\/items\/(\d+)\/consume$/);
+    // POST /v1/stock/invItems/{id}/consume → consume_item
+    const consumeMatch = resolvedPath.match(/^\/v1\/stock\/invItems\/(\d+)\/consume$/);
     if (consumeMatch && method === 'POST') {
       const itemId = parseInt(consumeMatch[1], 10);
       return this.stockService.consume(itemId, familyId, userId, {
@@ -273,8 +273,8 @@ export class McpService {
       });
     }
 
-    // POST /v1/stock/items/{id}/adjust → adjust_item
-    const adjustMatch = resolvedPath.match(/^\/v1\/stock\/items\/(\d+)\/adjust$/);
+    // POST /v1/stock/invItems/{id}/adjust → adjust_item
+    const adjustMatch = resolvedPath.match(/^\/v1\/stock\/invItems\/(\d+)\/adjust$/);
     if (adjustMatch && method === 'POST') {
       const itemId = parseInt(adjustMatch[1], 10);
       return this.stockService.adjust(itemId, familyId, userId, {
@@ -283,8 +283,8 @@ export class McpService {
       });
     }
 
-    // POST /v1/stock/items/{id}/transfer → move_item
-    const transferMatch = resolvedPath.match(/^\/v1\/stock\/items\/(\d+)\/transfer$/);
+    // POST /v1/stock/invItems/{id}/transfer → move_item
+    const transferMatch = resolvedPath.match(/^\/v1\/stock\/invItems\/(\d+)\/transfer$/);
     if (transferMatch && method === 'POST') {
       const itemId = parseInt(transferMatch[1], 10);
       const toLocationId = parseInt(params.to_location_id, 10);
@@ -296,8 +296,8 @@ export class McpService {
       });
     }
 
-    // GET /v1/stock/items/{id}/history → get_item_history
-    const historyMatch = resolvedPath.match(/^\/v1\/stock\/items\/(\d+)\/history$/);
+    // GET /v1/stock/invItems/{id}/history → get_item_history
+    const historyMatch = resolvedPath.match(/^\/v1\/stock\/invItems\/(\d+)\/history$/);
     if (historyMatch && method === 'GET') {
       const itemId = parseInt(historyMatch[1], 10);
       return this.stockService.getHistory(itemId);
@@ -327,28 +327,28 @@ export class McpService {
     familyId: number,
     userId: number,
   ): Promise<any> {
-    // GET /v1/lists → get_lists
-    if (resolvedPath === '/v1/lists' && method === 'GET') {
+    // GET /v1/hhLists → get_lists
+    if (resolvedPath === '/v1/hhLists' && method === 'GET') {
       return this.listsService.list(familyId, params.type);
     }
 
-    // POST /v1/lists → create_list
-    if (resolvedPath === '/v1/lists' && method === 'POST') {
+    // POST /v1/hhLists → create_list
+    if (resolvedPath === '/v1/hhLists' && method === 'POST') {
       return this.listsService.create(familyId, userId, {
         name: params.name,
         type: params.type,
       });
     }
 
-    // GET /v1/lists/{id} → get_list
-    const getListMatch = resolvedPath.match(/^\/v1\/lists\/(\d+)$/);
+    // GET /v1/hhLists/{id} → get_list
+    const getListMatch = resolvedPath.match(/^\/v1\/hhLists\/(\d+)$/);
     if (getListMatch && method === 'GET') {
       const listId = parseInt(getListMatch[1], 10);
       return this.listsService.getById(listId, familyId);
     }
 
-    // PUT /v1/lists/{id} → update_list
-    const updateListMatch = resolvedPath.match(/^\/v1\/lists\/(\d+)$/);
+    // PUT /v1/hhLists/{id} → update_list
+    const updateListMatch = resolvedPath.match(/^\/v1\/hhLists\/(\d+)$/);
     if (updateListMatch && method === 'PUT') {
       const listId = parseInt(updateListMatch[1], 10);
       return this.listsService.update(listId, familyId, {
@@ -357,15 +357,15 @@ export class McpService {
       });
     }
 
-    // DELETE /v1/lists/{id} → delete_list
-    const deleteListMatch = resolvedPath.match(/^\/v1\/lists\/(\d+)$/);
+    // DELETE /v1/hhLists/{id} → delete_list
+    const deleteListMatch = resolvedPath.match(/^\/v1\/hhLists\/(\d+)$/);
     if (deleteListMatch && method === 'DELETE') {
       const listId = parseInt(deleteListMatch[1], 10);
       return this.listsService.delete(listId, familyId);
     }
 
-    // POST /v1/lists/{id}/items → add_to_list
-    const addToListMatch = resolvedPath.match(/^\/v1\/lists\/(\d+)\/items$/);
+    // POST /v1/hhLists/{id}/invItems → add_to_list
+    const addToListMatch = resolvedPath.match(/^\/v1\/hhLists\/(\d+)\/invItems$/);
     if (addToListMatch && method === 'POST') {
       const listId = parseInt(addToListMatch[1], 10);
       return this.listsService.addItem(listId, familyId, {
@@ -376,8 +376,8 @@ export class McpService {
       });
     }
 
-    // PUT /v1/lists/items/{id} → update_list_item
-    const updateListItemMatch = resolvedPath.match(/^\/v1\/lists\/items\/(\d+)$/);
+    // PUT /v1/hhLists/invItems/{id} → update_list_item
+    const updateListItemMatch = resolvedPath.match(/^\/v1\/hhLists\/invItems\/(\d+)$/);
     if (updateListItemMatch && method === 'PUT') {
       const itemId = parseInt(updateListItemMatch[1], 10);
       return this.listsService.updateItem(itemId, {
@@ -387,29 +387,29 @@ export class McpService {
       });
     }
 
-    // DELETE /v1/lists/items/{id} → delete_list_item
-    const deleteListItemMatch = resolvedPath.match(/^\/v1\/lists\/items\/(\d+)$/);
+    // DELETE /v1/hhLists/invItems/{id} → delete_list_item
+    const deleteListItemMatch = resolvedPath.match(/^\/v1\/hhLists\/invItems\/(\d+)$/);
     if (deleteListItemMatch && method === 'DELETE') {
       const itemId = parseInt(deleteListItemMatch[1], 10);
       return this.listsService.deleteItem(itemId);
     }
 
-    // POST /v1/lists/items/{id}/check → check_list_item
-    const checkMatch = resolvedPath.match(/^\/v1\/lists\/items\/(\d+)\/check$/);
+    // POST /v1/hhLists/invItems/{id}/check → check_list_item
+    const checkMatch = resolvedPath.match(/^\/v1\/hhLists\/invItems\/(\d+)\/check$/);
     if (checkMatch && method === 'POST') {
       const itemId = parseInt(checkMatch[1], 10);
       return this.listsService.checkItem(itemId, userId);
     }
 
-    // POST /v1/lists/items/{id}/uncheck → uncheck_list_item
-    const uncheckMatch = resolvedPath.match(/^\/v1\/lists\/items\/(\d+)\/uncheck$/);
+    // POST /v1/hhLists/invItems/{id}/uncheck → uncheck_list_item
+    const uncheckMatch = resolvedPath.match(/^\/v1\/hhLists\/invItems\/(\d+)\/uncheck$/);
     if (uncheckMatch && method === 'POST') {
       const itemId = parseInt(uncheckMatch[1], 10);
       return this.listsService.uncheckItem(itemId);
     }
 
-    // POST /v1/lists/items/{id}/assign → assign_list_item
-    const assignMatch = resolvedPath.match(/^\/v1\/lists\/items\/(\d+)\/assign$/);
+    // POST /v1/hhLists/invItems/{id}/assign → assign_list_item
+    const assignMatch = resolvedPath.match(/^\/v1\/hhLists\/invItems\/(\d+)\/assign$/);
     if (assignMatch && method === 'POST') {
       const itemId = parseInt(assignMatch[1], 10);
       return this.listsService.assignItem(itemId, {
@@ -417,13 +417,13 @@ export class McpService {
       });
     }
 
-    // GET /v1/lists/my-tasks → get_my_tasks
-    if (resolvedPath === '/v1/lists/my-tasks' && method === 'GET') {
+    // GET /v1/hhLists/my-tasks → get_my_tasks
+    if (resolvedPath === '/v1/hhLists/my-tasks' && method === 'GET') {
       return this.listsService.getMyTasks(userId, familyId);
     }
 
-    // POST /v1/lists/auto-replenish → auto_replenish
-    if (resolvedPath === '/v1/lists/auto-replenish' && method === 'POST') {
+    // POST /v1/hhLists/auto-replenish → auto_replenish
+    if (resolvedPath === '/v1/hhLists/auto-replenish' && method === 'POST') {
       return this.listsService.autoReplenish(familyId);
     }
 
@@ -441,18 +441,18 @@ export class McpService {
     familyId: number,
     userId: number,
   ): Promise<any> {
-    // GET /v1/recipes/recommendations → get_recipe_recommendations
-    if (resolvedPath === '/v1/recipes/recommendations' && method === 'GET') {
+    // GET /v1/hhRecipes/recommendations → get_recipe_recommendations
+    if (resolvedPath === '/v1/hhRecipes/recommendations' && method === 'GET') {
       return this.recipesService.getRecommendations(familyId, params.recipe_count || 5);
     }
 
-    // GET /v1/recipes → search_recipes
-    if (resolvedPath === '/v1/recipes' && method === 'GET') {
+    // GET /v1/hhRecipes → search_recipes
+    if (resolvedPath === '/v1/hhRecipes' && method === 'GET') {
       return this.recipesService.list(familyId, params.query);
     }
 
-    // POST /v1/recipes → create_recipe
-    if (resolvedPath === '/v1/recipes' && method === 'POST') {
+    // POST /v1/hhRecipes → create_recipe
+    if (resolvedPath === '/v1/hhRecipes' && method === 'POST') {
       return this.recipesService.create(familyId, {
         name: params.name,
         description: params.description,
@@ -464,15 +464,15 @@ export class McpService {
       });
     }
 
-    // GET /v1/recipes/{id} → get_recipe
-    const getRecipeMatch = resolvedPath.match(/^\/v1\/recipes\/(\d+)$/);
+    // GET /v1/hhRecipes/{id} → get_recipe
+    const getRecipeMatch = resolvedPath.match(/^\/v1\/hhRecipes\/(\d+)$/);
     if (getRecipeMatch && method === 'GET') {
       const recipeId = parseInt(getRecipeMatch[1], 10);
       return this.recipesService.getById(recipeId);
     }
 
-    // PUT /v1/recipes/{id} → update_recipe
-    const updateRecipeMatch = resolvedPath.match(/^\/v1\/recipes\/(\d+)$/);
+    // PUT /v1/hhRecipes/{id} → update_recipe
+    const updateRecipeMatch = resolvedPath.match(/^\/v1\/hhRecipes\/(\d+)$/);
     if (updateRecipeMatch && method === 'PUT') {
       const recipeId = parseInt(updateRecipeMatch[1], 10);
       return this.recipesService.update(recipeId, familyId, {
@@ -483,8 +483,8 @@ export class McpService {
       });
     }
 
-    // DELETE /v1/recipes/{id} → delete_recipe
-    const deleteRecipeMatch = resolvedPath.match(/^\/v1\/recipes\/(\d+)$/);
+    // DELETE /v1/hhRecipes/{id} → delete_recipe
+    const deleteRecipeMatch = resolvedPath.match(/^\/v1\/hhRecipes\/(\d+)$/);
     if (deleteRecipeMatch && method === 'DELETE') {
       const recipeId = parseInt(deleteRecipeMatch[1], 10);
       return this.recipesService.delete(recipeId, familyId);
@@ -531,8 +531,8 @@ export class McpService {
       return this.mealPlansService.delete(planId, familyId);
     }
 
-    // POST /v1/meal-plans/{id}/items → add_meal_plan_item
-    const addItemMatch = resolvedPath.match(/^\/v1\/meal-plans\/(\d+)\/items$/);
+    // POST /v1/meal-plans/{id}/invItems → add_meal_plan_item
+    const addItemMatch = resolvedPath.match(/^\/v1\/meal-plans\/(\d+)\/invItems$/);
     if (addItemMatch && method === 'POST') {
       const planId = parseInt(addItemMatch[1], 10);
       return this.mealPlansService.addItem(planId, familyId, {
@@ -686,13 +686,13 @@ export class McpService {
     familyId: number,
     userId: number,
   ): Promise<any> {
-    // GET /v1/locations → get_locations
-    if (resolvedPath === '/v1/locations' && method === 'GET') {
+    // GET /v1/mdLocations → get_locations
+    if (resolvedPath === '/v1/mdLocations' && method === 'GET') {
       return this.locationsService.list(familyId);
     }
 
-    // POST /v1/locations → create_location
-    if (resolvedPath === '/v1/locations' && method === 'POST') {
+    // POST /v1/mdLocations → create_location
+    if (resolvedPath === '/v1/mdLocations' && method === 'POST') {
       return this.locationsService.create(familyId, {
         name: params.name,
         parentId: params.parentId,
@@ -714,13 +714,13 @@ export class McpService {
     familyId: number,
     userId: number,
   ): Promise<any> {
-    // GET /v1/categories → get_categories
-    if (resolvedPath === '/v1/categories' && method === 'GET') {
+    // GET /v1/mdCategories → get_categories
+    if (resolvedPath === '/v1/mdCategories' && method === 'GET') {
       return this.categoriesService.list(familyId);
     }
 
-    // POST /v1/categories → create_category
-    if (resolvedPath === '/v1/categories' && method === 'POST') {
+    // POST /v1/mdCategories → create_category
+    if (resolvedPath === '/v1/mdCategories' && method === 'POST') {
       return this.categoriesService.create(familyId, {
         name: params.name,
       });
@@ -769,26 +769,26 @@ export class McpService {
     familyId: number,
     userId: number,
   ): Promise<any> {
-    // GET /v1/notifications → get_notifications
-    if (resolvedPath === '/v1/notifications' && method === 'GET') {
+    // GET /v1/sysNotifications → get_notifications
+    if (resolvedPath === '/v1/sysNotifications' && method === 'GET') {
       const unreadOnly = params.unread === 'true';
       return this.notificationsService.listNotifications(userId, familyId, unreadOnly);
     }
 
-    // GET /v1/notifications/unread-count → get_unread_notification_count
-    if (resolvedPath === '/v1/notifications/unread-count' && method === 'GET') {
+    // GET /v1/sysNotifications/unread-count → get_unread_notification_count
+    if (resolvedPath === '/v1/sysNotifications/unread-count' && method === 'GET') {
       return this.notificationsService.getUnreadCount(userId, familyId);
     }
 
-    // POST /v1/notifications/{id}/read → mark_notification_read
-    const markReadMatch = resolvedPath.match(/^\/v1\/notifications\/(\d+)\/read$/);
+    // POST /v1/sysNotifications/{id}/read → mark_notification_read
+    const markReadMatch = resolvedPath.match(/^\/v1\/sysNotifications\/(\d+)\/read$/);
     if (markReadMatch && method === 'POST') {
       const notificationId = parseInt(markReadMatch[1], 10);
       return this.notificationsService.markAsRead(notificationId, userId);
     }
 
-    // POST /v1/notifications/read-all → mark_all_notifications_read
-    if (resolvedPath === '/v1/notifications/read-all' && method === 'POST') {
+    // POST /v1/sysNotifications/read-all → mark_all_notifications_read
+    if (resolvedPath === '/v1/sysNotifications/read-all' && method === 'POST') {
       return this.notificationsService.markAllAsRead(userId, familyId);
     }
 

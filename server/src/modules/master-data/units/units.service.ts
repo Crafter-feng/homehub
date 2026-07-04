@@ -1,7 +1,7 @@
 import { Injectable, Inject, NotFoundException } from '@nestjs/common';
 import { DATABASE_TOKEN } from '../../../db/database.module';
 import { eq, and } from 'drizzle-orm';
-import { units } from '../../../db/schema';
+import { mdUnits } from '../../../db/schema';
 
 @Injectable()
 export class UnitsService {
@@ -10,13 +10,13 @@ export class UnitsService {
   ) {}
 
   async list(familyId: number) {
-    return this.db.select().from(units)
-      .where(eq(units.familyId, familyId))
+    return this.db.select().from(mdUnits)
+      .where(eq(mdUnits.familyId, familyId))
       .all();
   }
 
   async create(familyId: number, data: { name: string; parentId?: number; conversionFactor?: number; notes?: string }) {
-    return this.db.insert(units).values({
+    return this.db.insert(mdUnits).values({
       familyId,
       name: data.name,
       parentId: data.parentId,
@@ -26,8 +26,8 @@ export class UnitsService {
   }
 
   async update(unitId: number, familyId: number, data: { name?: string; parentId?: number; conversionFactor?: number; notes?: string }) {
-    const unit = await this.db.select().from(units)
-      .where(and(eq(units.id, unitId), eq(units.familyId, familyId)))
+    const unit = await this.db.select().from(mdUnits)
+      .where(and(eq(mdUnits.id, unitId), eq(mdUnits.familyId, familyId)))
       .get();
     if (!unit) throw new NotFoundException('单位不存在');
 
@@ -37,23 +37,23 @@ export class UnitsService {
     if (data.conversionFactor !== undefined) updates.conversionFactor = data.conversionFactor;
     if (data.notes !== undefined) updates.notes = data.notes;
 
-    await this.db.update(units).set(updates).where(eq(units.id, unitId)).run();
-    return this.db.select().from(units).where(eq(units.id, unitId)).get();
+    await this.db.update(mdUnits).set(updates).where(eq(mdUnits.id, unitId)).run();
+    return this.db.select().from(mdUnits).where(eq(mdUnits.id, unitId)).get();
   }
 
   async delete(unitId: number, familyId: number) {
-    await this.db.delete(units)
-      .where(and(eq(units.id, unitId), eq(units.familyId, familyId)))
+    await this.db.delete(mdUnits)
+      .where(and(eq(mdUnits.id, unitId), eq(mdUnits.familyId, familyId)))
       .run();
     return { success: true };
   }
 
   async convert(familyId: number, fromUnit: string, toUnit: string, value: number) {
-    const from = await this.db.select().from(units)
-      .where(and(eq(units.familyId, familyId), eq(units.name, fromUnit)))
+    const from = await this.db.select().from(mdUnits)
+      .where(and(eq(mdUnits.familyId, familyId), eq(mdUnits.name, fromUnit)))
       .get();
-    const to = await this.db.select().from(units)
-      .where(and(eq(units.familyId, familyId), eq(units.name, toUnit)))
+    const to = await this.db.select().from(mdUnits)
+      .where(and(eq(mdUnits.familyId, familyId), eq(mdUnits.name, toUnit)))
       .get();
 
     if (!from || !to) throw new NotFoundException('单位不存在');

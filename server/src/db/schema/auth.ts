@@ -1,5 +1,10 @@
+// ═══════════════════════════════════════════════════════
+// 认证 & 家庭 — 用户、家庭、成员、令牌
+// ═══════════════════════════════════════════════════════
+
 import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
 
+// ── 用户 ──
 export const users = sqliteTable('users', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   email: text('email').notNull().unique(),
@@ -10,6 +15,7 @@ export const users = sqliteTable('users', {
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
 });
 
+// ── 家庭 ──
 export const families = sqliteTable('families', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   name: text('name').notNull(),
@@ -17,6 +23,7 @@ export const families = sqliteTable('families', {
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
 });
 
+// ── 家庭成员 ──
 export const familyMembers = sqliteTable('family_members', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   userId: integer('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
@@ -25,6 +32,7 @@ export const familyMembers = sqliteTable('family_members', {
   joinedAt: integer('joined_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
 });
 
+// ── API 令牌 ──
 export const apiTokens = sqliteTable('api_tokens', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   userId: integer('user_id').notNull().references(() => users.id),
@@ -39,6 +47,7 @@ export const apiTokens = sqliteTable('api_tokens', {
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
 });
 
+// ── 刷新令牌 ──
 export const refreshTokens = sqliteTable('refresh_tokens', {
   id: text('id').primaryKey(),
   userId: integer('user_id').notNull().references(() => users.id),

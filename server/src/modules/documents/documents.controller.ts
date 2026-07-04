@@ -20,7 +20,7 @@ export class DocumentsController {
   @UseInterceptors(FileInterceptor('file', {
     storage: diskStorage({
       destination: (req, file, cb) => {
-        const dir = 'uploads/documents';
+        const dir = 'uploads/invDocuments';
         // 确保目录存在
         const fs = require('fs');
         fs.mkdirSync(dir, { recursive: true });

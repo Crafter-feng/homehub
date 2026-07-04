@@ -64,7 +64,7 @@
 import { ref, reactive, computed, watch } from 'vue';
 import { NModal, NInput, NInputNumber, NSelect, NButton, NIcon, useMessage } from 'naive-ui';
 import { CloudUploadOutline, ScanOutline } from '@vicons/ionicons5';
-import { productsApi, locationsApi, unitsApi, brandsApi } from '@/api/client';
+import { productsApi, unitsApi, brandsApi } from '@/api/client';
 import api from '@/api/client';
 import { clientRegistry } from '@/plugins/client-registry';
 import type { ScanResult } from '@/plugins/types/client-plugin.types';

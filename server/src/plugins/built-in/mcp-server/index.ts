@@ -18,7 +18,7 @@ const builtinTools: McpToolExports[] = [
     name: 'search_items',
     description: '搜索库存物品',
     method: 'GET',
-    apiPath: '/v1/stock/items',
+    apiPath: '/v1/stock/invItems',
     parameters: {
       query: { type: 'string', optional: true, description: '搜索关键词' },
       category: { type: 'string', optional: true, description: '物品类别' },
@@ -31,7 +31,7 @@ const builtinTools: McpToolExports[] = [
     name: 'get_item',
     description: '获取单个库存物品详情',
     method: 'GET',
-    apiPath: '/v1/stock/items/{item_id}',
+    apiPath: '/v1/stock/invItems/{item_id}',
     parameters: {
       item_id: { type: 'string', description: '物品ID' },
     },
@@ -40,7 +40,7 @@ const builtinTools: McpToolExports[] = [
     name: 'add_item',
     description: '添加物品到库存',
     method: 'POST',
-    apiPath: '/v1/stock/items',
+    apiPath: '/v1/stock/invItems',
     parameters: {
       name: { type: 'string', description: '物品名称' },
       quantity: { type: 'number', optional: true, default: 1, description: '数量' },
@@ -56,7 +56,7 @@ const builtinTools: McpToolExports[] = [
     name: 'consume_item',
     description: '消耗/使用物品',
     method: 'POST',
-    apiPath: '/v1/stock/items/{item_id}/consume',
+    apiPath: '/v1/stock/invItems/{item_id}/consume',
     parameters: {
       item_id: { type: 'string', description: '物品ID' },
       quantity: { type: 'number', description: '消耗数量' },
@@ -67,7 +67,7 @@ const builtinTools: McpToolExports[] = [
     name: 'adjust_item',
     description: '调整库存数量（盘点/纠错）',
     method: 'POST',
-    apiPath: '/v1/stock/items/{item_id}/adjust',
+    apiPath: '/v1/stock/invItems/{item_id}/adjust',
     parameters: {
       item_id: { type: 'string', description: '物品ID' },
       quantity: { type: 'number', description: '调整后数量' },
@@ -78,7 +78,7 @@ const builtinTools: McpToolExports[] = [
     name: 'move_item',
     description: '移动物品位置',
     method: 'POST',
-    apiPath: '/v1/stock/items/{item_id}/transfer',
+    apiPath: '/v1/stock/invItems/{item_id}/transfer',
     parameters: {
       item_id: { type: 'string', description: '物品ID' },
       to_location_id: { type: 'string', description: '目标位置ID' },
@@ -88,7 +88,7 @@ const builtinTools: McpToolExports[] = [
     name: 'update_item',
     description: '更新物品信息',
     method: 'PUT',
-    apiPath: '/v1/stock/items/{item_id}',
+    apiPath: '/v1/stock/invItems/{item_id}',
     parameters: {
       item_id: { type: 'string', description: '物品ID' },
       name: { type: 'string', optional: true, description: '物品名称' },
@@ -101,7 +101,7 @@ const builtinTools: McpToolExports[] = [
     name: 'delete_item',
     description: '删除物品',
     method: 'DELETE',
-    apiPath: '/v1/stock/items/{item_id}',
+    apiPath: '/v1/stock/invItems/{item_id}',
     parameters: {
       item_id: { type: 'string', description: '物品ID' },
     },
@@ -126,7 +126,7 @@ const builtinTools: McpToolExports[] = [
     name: 'get_item_history',
     description: '查看物品操作历史',
     method: 'GET',
-    apiPath: '/v1/stock/items/{item_id}/history',
+    apiPath: '/v1/stock/invItems/{item_id}/history',
     parameters: {
       item_id: { type: 'string', description: '物品ID' },
     },
@@ -139,7 +139,7 @@ const builtinTools: McpToolExports[] = [
     name: 'get_lists',
     description: '查看所有清单',
     method: 'GET',
-    apiPath: '/v1/lists',
+    apiPath: '/v1/hhLists',
     parameters: {
       type: { type: 'string', optional: true, description: '清单类型' },
     },
@@ -148,7 +148,7 @@ const builtinTools: McpToolExports[] = [
     name: 'get_list',
     description: '查看单个清单详情（含条目）',
     method: 'GET',
-    apiPath: '/v1/lists/{list_id}',
+    apiPath: '/v1/hhLists/{list_id}',
     parameters: {
       list_id: { type: 'string', description: '清单ID' },
     },
@@ -157,7 +157,7 @@ const builtinTools: McpToolExports[] = [
     name: 'create_list',
     description: '创建清单',
     method: 'POST',
-    apiPath: '/v1/lists',
+    apiPath: '/v1/hhLists',
     parameters: {
       name: { type: 'string', description: '清单名称' },
       type: { type: 'string', description: '清单类型', enum: ['shopping', 'todo', 'chore', 'holiday', 'meal_plan'] },
@@ -168,7 +168,7 @@ const builtinTools: McpToolExports[] = [
     name: 'update_list',
     description: '更新清单信息',
     method: 'PUT',
-    apiPath: '/v1/lists/{list_id}',
+    apiPath: '/v1/hhLists/{list_id}',
     parameters: {
       list_id: { type: 'string', description: '清单ID' },
       name: { type: 'string', optional: true, description: '清单名称' },
@@ -179,7 +179,7 @@ const builtinTools: McpToolExports[] = [
     name: 'delete_list',
     description: '删除清单',
     method: 'DELETE',
-    apiPath: '/v1/lists/{list_id}',
+    apiPath: '/v1/hhLists/{list_id}',
     parameters: {
       list_id: { type: 'string', description: '清单ID' },
     },
@@ -188,7 +188,7 @@ const builtinTools: McpToolExports[] = [
     name: 'add_to_list',
     description: '添加到清单',
     method: 'POST',
-    apiPath: '/v1/lists/{list_id}/items',
+    apiPath: '/v1/hhLists/{list_id}/invItems',
     parameters: {
       list_id: { type: 'string', description: '清单ID' },
       content: { type: 'string', description: '条目内容' },
@@ -201,7 +201,7 @@ const builtinTools: McpToolExports[] = [
     name: 'update_list_item',
     description: '更新清单条目',
     method: 'PUT',
-    apiPath: '/v1/lists/items/{item_id}',
+    apiPath: '/v1/hhLists/invItems/{item_id}',
     parameters: {
       item_id: { type: 'string', description: '条目ID' },
       content: { type: 'string', optional: true, description: '条目内容' },
@@ -213,7 +213,7 @@ const builtinTools: McpToolExports[] = [
     name: 'delete_list_item',
     description: '删除清单条目',
     method: 'DELETE',
-    apiPath: '/v1/lists/items/{item_id}',
+    apiPath: '/v1/hhLists/invItems/{item_id}',
     parameters: {
       item_id: { type: 'string', description: '条目ID' },
     },
@@ -222,7 +222,7 @@ const builtinTools: McpToolExports[] = [
     name: 'check_list_item',
     description: '打勾完成清单条目',
     method: 'POST',
-    apiPath: '/v1/lists/items/{item_id}/check',
+    apiPath: '/v1/hhLists/invItems/{item_id}/check',
     parameters: {
       item_id: { type: 'string', description: '条目ID' },
     },
@@ -231,7 +231,7 @@ const builtinTools: McpToolExports[] = [
     name: 'uncheck_list_item',
     description: '取消完成清单条目',
     method: 'POST',
-    apiPath: '/v1/lists/items/{item_id}/uncheck',
+    apiPath: '/v1/hhLists/invItems/{item_id}/uncheck',
     parameters: {
       item_id: { type: 'string', description: '条目ID' },
     },
@@ -240,7 +240,7 @@ const builtinTools: McpToolExports[] = [
     name: 'assign_list_item',
     description: '指派清单条目给成员',
     method: 'POST',
-    apiPath: '/v1/lists/items/{item_id}/assign',
+    apiPath: '/v1/hhLists/invItems/{item_id}/assign',
     parameters: {
       item_id: { type: 'string', description: '条目ID' },
       assignee_id: { type: 'string', description: '指派人ID' },
@@ -250,14 +250,14 @@ const builtinTools: McpToolExports[] = [
     name: 'get_my_tasks',
     description: '查看我被指派的任务',
     method: 'GET',
-    apiPath: '/v1/lists/my-tasks',
+    apiPath: '/v1/hhLists/my-tasks',
     parameters: {},
   },
   {
     name: 'auto_replenish',
     description: '自动生成补货清单',
     method: 'POST',
-    apiPath: '/v1/lists/auto-replenish',
+    apiPath: '/v1/hhLists/auto-replenish',
     parameters: {},
   },
 
@@ -268,7 +268,7 @@ const builtinTools: McpToolExports[] = [
     name: 'search_recipes',
     description: '搜索食谱',
     method: 'GET',
-    apiPath: '/v1/recipes',
+    apiPath: '/v1/hhRecipes',
     parameters: {
       query: { type: 'string', optional: true, description: '搜索关键词' },
     },
@@ -277,7 +277,7 @@ const builtinTools: McpToolExports[] = [
     name: 'get_recipe',
     description: '获取食谱详情',
     method: 'GET',
-    apiPath: '/v1/recipes/{recipe_id}',
+    apiPath: '/v1/hhRecipes/{recipe_id}',
     parameters: {
       recipe_id: { type: 'string', description: '食谱ID' },
     },
@@ -286,7 +286,7 @@ const builtinTools: McpToolExports[] = [
     name: 'create_recipe',
     description: '创建食谱',
     method: 'POST',
-    apiPath: '/v1/recipes',
+    apiPath: '/v1/hhRecipes',
     parameters: {
       name: { type: 'string', description: '食谱名称' },
       description: { type: 'string', optional: true, description: '描述' },
@@ -301,7 +301,7 @@ const builtinTools: McpToolExports[] = [
     name: 'update_recipe',
     description: '更新食谱',
     method: 'PUT',
-    apiPath: '/v1/recipes/{recipe_id}',
+    apiPath: '/v1/hhRecipes/{recipe_id}',
     parameters: {
       recipe_id: { type: 'string', description: '食谱ID' },
       name: { type: 'string', optional: true, description: '食谱名称' },
@@ -314,7 +314,7 @@ const builtinTools: McpToolExports[] = [
     name: 'delete_recipe',
     description: '删除食谱',
     method: 'DELETE',
-    apiPath: '/v1/recipes/{recipe_id}',
+    apiPath: '/v1/hhRecipes/{recipe_id}',
     parameters: {
       recipe_id: { type: 'string', description: '食谱ID' },
     },
@@ -323,7 +323,7 @@ const builtinTools: McpToolExports[] = [
     name: 'get_recipe_recommendations',
     description: '根据库存推荐食谱',
     method: 'GET',
-    apiPath: '/v1/recipes/recommendations',
+    apiPath: '/v1/hhRecipes/recommendations',
     parameters: {
       recipe_count: { type: 'number', optional: true, description: '返回数量' },
     },
@@ -362,7 +362,7 @@ const builtinTools: McpToolExports[] = [
     name: 'add_meal_plan_item',
     description: '添加餐计划条目',
     method: 'POST',
-    apiPath: '/v1/meal-plans/{plan_id}/items',
+    apiPath: '/v1/meal-plans/{plan_id}/invItems',
     parameters: {
       plan_id: { type: 'string', description: '餐计划ID' },
       dayOfWeek: { type: 'number', description: '星期几(0-6)' },
@@ -518,14 +518,14 @@ const builtinTools: McpToolExports[] = [
     name: 'get_locations',
     description: '查看所有存储位置',
     method: 'GET',
-    apiPath: '/v1/locations',
+    apiPath: '/v1/mdLocations',
     parameters: {},
   },
   {
     name: 'create_location',
     description: '创建存储位置',
     method: 'POST',
-    apiPath: '/v1/locations',
+    apiPath: '/v1/mdLocations',
     parameters: {
       name: { type: 'string', description: '位置名称' },
       parentId: { type: 'number', optional: true, description: '父位置ID' },
@@ -536,14 +536,14 @@ const builtinTools: McpToolExports[] = [
     name: 'get_categories',
     description: '查看所有物品分类',
     method: 'GET',
-    apiPath: '/v1/categories',
+    apiPath: '/v1/mdCategories',
     parameters: {},
   },
   {
     name: 'create_category',
     description: '创建物品分类',
     method: 'POST',
-    apiPath: '/v1/categories',
+    apiPath: '/v1/mdCategories',
     parameters: {
       name: { type: 'string', description: '分类名称' },
     },
@@ -552,21 +552,21 @@ const builtinTools: McpToolExports[] = [
     name: 'get_tags',
     description: '查看所有标签',
     method: 'GET',
-    apiPath: '/v1/tags',
+    apiPath: '/v1/mdTags',
     parameters: {},
   },
   {
     name: 'get_brands',
     description: '查看所有品牌',
     method: 'GET',
-    apiPath: '/v1/brands',
+    apiPath: '/v1/mdBrands',
     parameters: {},
   },
   {
     name: 'get_units',
     description: '查看所有单位',
     method: 'GET',
-    apiPath: '/v1/units',
+    apiPath: '/v1/mdUnits',
     parameters: {},
   },
 
@@ -604,7 +604,7 @@ const builtinTools: McpToolExports[] = [
     name: 'get_notifications',
     description: '查看通知列表',
     method: 'GET',
-    apiPath: '/v1/notifications',
+    apiPath: '/v1/sysNotifications',
     parameters: {
       unread: { type: 'string', optional: true, description: '只看未读: true/false' },
     },
@@ -613,14 +613,14 @@ const builtinTools: McpToolExports[] = [
     name: 'get_unread_notification_count',
     description: '获取未读通知数量',
     method: 'GET',
-    apiPath: '/v1/notifications/unread-count',
+    apiPath: '/v1/sysNotifications/unread-count',
     parameters: {},
   },
   {
     name: 'mark_notification_read',
     description: '标记通知为已读',
     method: 'POST',
-    apiPath: '/v1/notifications/{notification_id}/read',
+    apiPath: '/v1/sysNotifications/{notification_id}/read',
     parameters: {
       notification_id: { type: 'string', description: '通知ID' },
     },
@@ -629,7 +629,7 @@ const builtinTools: McpToolExports[] = [
     name: 'mark_all_notifications_read',
     description: '标记所有通知为已读',
     method: 'POST',
-    apiPath: '/v1/notifications/read-all',
+    apiPath: '/v1/sysNotifications/read-all',
     parameters: {},
   },
 

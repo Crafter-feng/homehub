@@ -1,13 +1,13 @@
 import { Injectable, Inject, NotFoundException } from '@nestjs/common';
 import { DATABASE_TOKEN } from '../../../db/database.module';
 import { eq, and, desc } from 'drizzle-orm';
-import { encoderJobs, items, locations } from '../../../db/schema';
+import { sysEncoderJobs, invItems, mdLocations } from '../../../db/schema';
 import { GenerateDto, BatchGenerateDto } from './dto/encoder.dto';
 import * as crypto from 'crypto';
 
 /**
  * EncoderService — generates QR codes, NFC NDEF payloads, and barcodes
- * for items/locations. Records all generation jobs in encoder_jobs table.
+ * for invItems/locations. Records all generation jobs in encoder_jobs table.
  *
  * P-T06: Created to support Encoder API endpoints.
  */
@@ -32,7 +32,7 @@ export class EncoderService {
     const code = await this.renderCode(dto.outputType, content, target);
 
     // Log the generation job
-    await this.db.insert(encoderJobs).values({
+    await this.db.insert(sysEncoderJobs).values({
       familyId,
       outputType: dto.outputType as any,
       targetType: dto.targetType as any,
@@ -72,7 +72,7 @@ export class EncoderService {
     }
 
     // Log batch job
-    await this.db.insert(encoderJobs).values({
+    await this.db.insert(sysEncoderJobs).values({
       familyId,
       outputType: dto.outputType as any,
       targetType: 'multi' as any,
@@ -90,9 +90,9 @@ export class EncoderService {
    * List encoder generation history.
    */
   async listJobs(familyId: number) {
-    return this.db.select().from(encoderJobs)
-      .where(eq(encoderJobs.familyId, familyId))
-      .orderBy(desc(encoderJobs.generatedAt))
+    return this.db.select().from(sysEncoderJobs)
+      .where(eq(sysEncoderJobs.familyId, familyId))
+      .orderBy(desc(sysEncoderJobs.generatedAt))
       .all();
   }
 
@@ -100,13 +100,13 @@ export class EncoderService {
 
   private async resolveTarget(targetType: string, targetId: number, familyId: number): Promise<any> {
     if (targetType === 'item') {
-      return this.db.select().from(items)
-        .where(and(eq(items.id, targetId), eq(items.familyId, familyId)))
+      return this.db.select().from(invItems)
+        .where(and(eq(invItems.id, targetId), eq(invItems.familyId, familyId)))
         .get();
     }
     if (targetType === 'location') {
-      return this.db.select().from(locations)
-        .where(and(eq(locations.id, targetId), eq(locations.familyId, familyId)))
+      return this.db.select().from(mdLocations)
+        .where(and(eq(mdLocations.id, targetId), eq(mdLocations.familyId, familyId)))
         .get();
     }
     return null;

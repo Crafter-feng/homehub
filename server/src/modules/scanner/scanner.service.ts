@@ -1,7 +1,7 @@
 import { Injectable, Inject } from '@nestjs/common';
 import { DATABASE_TOKEN } from '../../db/database.module';
 import { eq, and, sql } from 'drizzle-orm';
-import { items, nfcTagState } from '../../db/schema';
+import { invItems, sysNfcTagState } from '../../db/schema';
 
 /**
  * ScannerService - 统一的扫描/识别服务
@@ -21,8 +21,8 @@ export class ScannerService {
    * 本地库存条码查询
    */
   async lookupLocal(familyId: number, barcode: string) {
-    return this.db.select().from(items)
-      .where(and(eq(items.familyId, familyId), eq(items.barcode, barcode)))
+    return this.db.select().from(invItems)
+      .where(and(eq(invItems.familyId, familyId), eq(invItems.barcode, barcode)))
       .get();
   }
 
@@ -74,8 +74,8 @@ export class ScannerService {
         source: 'openfoodfacts',
         barcode,
         name: data.product.product_name || data.product.product_name_zh || '',
-        brand: data.product.brands || '',
-        category: data.product.categories || '',
+        brand: data.product.mdBrands || '',
+        category: data.product.mdCategories || '',
         image: data.product.image_url || '',
         description: data.product.generic_name || '',
       };
@@ -106,8 +106,8 @@ export class ScannerService {
    * 获取 NFC 标签状态
    */
   async getNfcTagState(tagUid: string) {
-    return this.db.select().from(nfcTagState)
-      .where(eq(nfcTagState.tagUid, tagUid))
+    return this.db.select().from(sysNfcTagState)
+      .where(eq(sysNfcTagState.tagUid, tagUid))
       .get();
   }
 
@@ -118,17 +118,17 @@ export class ScannerService {
     const existing = await this.getNfcTagState(tagUid);
 
     if (existing) {
-      await this.db.update(nfcTagState)
+      await this.db.update(sysNfcTagState)
         .set({
           ndefWritten,
           ndefWrittenAt: ndefWritten ? new Date() : existing.ndefWrittenAt,
           lastReadAt: new Date(),
-          readCount: sql`${nfcTagState.readCount} + 1`,
+          readCount: sql`${sysNfcTagState.readCount} + 1`,
         })
-        .where(eq(nfcTagState.id, existing.id))
+        .where(eq(sysNfcTagState.id, existing.id))
         .run();
     } else {
-      await this.db.insert(nfcTagState).values({
+      await this.db.insert(sysNfcTagState).values({
         familyId,
         tagUid,
         ndefWritten,

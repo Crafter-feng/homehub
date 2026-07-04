@@ -7,7 +7,7 @@ import { PaginationQuery } from '../../common/dto/pagination.dto';
 /**
  * ItemHistoryController — REMOVED.
  *
- * This was a duplicate of StockController's GET /stock/items/:id/history.
+ * This was a duplicate of StockController's GET /stock/invItems/:id/history.
  * All item history access should go through the stock module.
  * The HistoryController (GET /history/timeline) remains for family-level timeline queries.
  */

@@ -309,7 +309,7 @@
           <n-button type="primary" size="large" @click="handleQuickStockInSearch" :loading="quickStockInSearching" style="flex-shrink: 0">
             搜索
           </n-button>
-          <n-button size="large" @click="handleBarcodeScan('search')" :disabled="!barcodeAdapter?.isSupported" style="flex-shrink: 0">
+          <n-button size="large" @click="handleBarcodeScan" :disabled="!barcodeAdapter?.isSupported" style="flex-shrink: 0">
             <template #icon><n-icon :size="20"><ScanOutline /></n-icon></template>
           </n-button>
         </div>
@@ -403,10 +403,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, h } from 'vue';
+import { ref, computed, onMounted, h } from 'vue';
 import {
   NButton, NButtonGroup, NSpace, NInput, NSelect, NDataTable,
-  NModal, NForm, NFormItem, NInputNumber, NSpin, NAlert, NCollapseTransition,
+  NModal, NInputNumber, NSpin, NAlert, NCollapseTransition,
   NTag, NIcon, NProgress, NCard, NGrid, NGi, useMessage, useDialog,
 } from 'naive-ui';
 import type { DataTableColumns } from 'naive-ui';
@@ -421,8 +421,8 @@ import {
   CreateOutline, TrashOutline, CheckmarkOutline,
   CubeOutline, WarningOutline, AlertCircleOutline,
   ClipboardOutline, CloseOutline, CheckmarkCircleOutline,
-  WalletOutline, ArrowDownOutline, ScanOutline,
-  ChevronForwardOutline, ArrowBackOutline,
+  ArrowDownOutline, ScanOutline,
+  ChevronForwardOutline,
 } from '@vicons/ionicons5';
 import { getCategoryColor } from '@/utils/format';
 import ProductFormDialog from '@/components/ProductFormDialog.vue';
@@ -490,13 +490,6 @@ const expiredCount = computed(() =>
   stockStore.items.filter(i => isExpired(i)).length
 );
 
-const totalValue = computed(() =>
-  stockStore.items.reduce((sum, i) => {
-    const price = i.purchasePrice || i.lastPrice || 0;
-    return sum + (i.quantity || 0) * price;
-  }, 0)
-);
-
 const categoryOptions = computed(() =>
   categories.value.map(c => ({ label: `${c.icon || ''} ${c.name}`, value: c.name }))
 );
@@ -515,10 +508,6 @@ const statusFilterOptions = computed(() => [
 
 const normalCount = computed(() =>
   stockStore.items.filter(i => !isExpired(i) && !isExpiring(i) && !isLowStock(i)).length
-);
-
-const unitOptions = computed(() =>
-  units.value.map(u => ({ label: u.name, value: u.name }))
 );
 
 const filteredItems = computed(() => {
@@ -592,11 +581,6 @@ function openQuickStockIn() {
   quickStockInPrice.value = 0;
   quickStockInLocationId.value = null;
   quickStockInNote.value = '';
-  quickStockInNewProduct.name = '';
-  quickStockInNewProduct.barcode = '';
-  quickStockInNewProduct.type = null;
-  quickStockInNewProduct.unit = '';
-  quickStockInNewProduct.brand = '';
   showQuickStockInModal.value = true;
 }
 
@@ -662,7 +646,7 @@ const barcodeAdapter = computed(() => {
   return clientRegistry.getScannerAdapter('barcode');
 });
 
-async function handleBarcodeScan(target: 'search' | 'barcode') {
+async function handleBarcodeScan() {
   const adapter = barcodeAdapter.value;
   if (!adapter?.isSupported) {
     message.warning('当前浏览器不支持摄像头扫码');
@@ -670,12 +654,8 @@ async function handleBarcodeScan(target: 'search' | 'barcode') {
   }
   try {
     const result: ScanResult = await adapter.scan();
-    if (target === 'search') {
-      quickStockInSearch.value = result.raw;
-      await handleQuickStockInSearch();
-    } else {
-      quickStockInNewProduct.barcode = result.raw;
-    }
+    quickStockInSearch.value = result.raw;
+    await handleQuickStockInSearch();
     message.success(`扫码成功: ${result.raw}`);
   } catch {
     message.info('扫码已取消');

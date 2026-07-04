@@ -161,7 +161,7 @@ export interface TriggerActionPluginExports {
 
 /** Contextual signals for action resolution, typically provided by the frontend */
 export interface ResolveContext {
-  /** Current page path of the user (e.g. "/stock/items", "/shopping") */
+  /** Current page path of the user (e.g. "/stock/invItems", "/shopping") */
   pagePath?: string;
   /** Known location ID of the user/device */
   locationId?: number;

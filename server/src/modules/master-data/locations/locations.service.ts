@@ -1,7 +1,7 @@
 import { Injectable, Inject, NotFoundException } from '@nestjs/common';
 import { DATABASE_TOKEN } from '../../../db/database.module';
 import { eq, and } from 'drizzle-orm';
-import { locations, items } from '../../../db/schema';
+import { mdLocations, invItems } from '../../../db/schema';
 
 export class CreateLocationDto {
   name: string;
@@ -20,31 +20,31 @@ export class LocationsService {
   ) {}
 
   async list(familyId: number) {
-    const locs = await this.db.select().from(locations)
-      .where(eq(locations.familyId, familyId))
+    const locs = await this.db.select().from(mdLocations)
+      .where(eq(mdLocations.familyId, familyId))
       .all();
     return this.buildTree(locs);
   }
 
   async getById(locationId: number, familyId: number) {
-    const loc = await this.db.select().from(locations)
-      .where(and(eq(locations.id, locationId), eq(locations.familyId, familyId)))
+    const loc = await this.db.select().from(mdLocations)
+      .where(and(eq(mdLocations.id, locationId), eq(mdLocations.familyId, familyId)))
       .get();
     if (!loc) throw new NotFoundException('位置不存在');
 
-    const locationItems = await this.db.select().from(items)
-      .where(eq(items.locationId, locationId))
+    const locationItems = await this.db.select().from(invItems)
+      .where(eq(invItems.locationId, locationId))
       .all();
 
-    const children = await this.db.select().from(locations)
-      .where(eq(locations.parentId, locationId))
+    const children = await this.db.select().from(mdLocations)
+      .where(eq(mdLocations.parentId, locationId))
       .all();
 
-    return { ...loc, items: locationItems, children };
+    return { ...loc, invItems: locationItems, children };
   }
 
   async create(familyId: number, dto: CreateLocationDto) {
-    return this.db.insert(locations).values({
+    return this.db.insert(mdLocations).values({
       familyId,
       name: dto.name,
       parentId: dto.parentId,
@@ -55,8 +55,8 @@ export class LocationsService {
   }
 
   async update(locationId: number, familyId: number, dto: UpdateLocationDto) {
-    const loc = await this.db.select().from(locations)
-      .where(and(eq(locations.id, locationId), eq(locations.familyId, familyId)))
+    const loc = await this.db.select().from(mdLocations)
+      .where(and(eq(mdLocations.id, locationId), eq(mdLocations.familyId, familyId)))
       .get();
     if (!loc) throw new NotFoundException('位置不存在');
 
@@ -67,34 +67,34 @@ export class LocationsService {
     if (dto.image !== undefined) updates.image = dto.image;
     if (dto.notes !== undefined) updates.notes = dto.notes;
 
-    await this.db.update(locations).set(updates).where(eq(locations.id, locationId)).run();
+    await this.db.update(mdLocations).set(updates).where(eq(mdLocations.id, locationId)).run();
     return this.getById(locationId, familyId);
   }
 
   async delete(locationId: number, familyId: number) {
-    const loc = await this.db.select().from(locations)
-      .where(and(eq(locations.id, locationId), eq(locations.familyId, familyId)))
+    const loc = await this.db.select().from(mdLocations)
+      .where(and(eq(mdLocations.id, locationId), eq(mdLocations.familyId, familyId)))
       .get();
     if (!loc) throw new NotFoundException('位置不存在');
 
-    const children = await this.db.select().from(locations)
-      .where(eq(locations.parentId, locationId))
+    const children = await this.db.select().from(mdLocations)
+      .where(eq(mdLocations.parentId, locationId))
       .all();
     if (children.length > 0) {
       for (const child of children) {
-        await this.db.update(locations)
+        await this.db.update(mdLocations)
           .set({ parentId: loc.parentId })
-          .where(eq(locations.id, child.id))
+          .where(eq(mdLocations.id, child.id))
           .run();
       }
     }
 
-    await this.db.update(items)
+    await this.db.update(invItems)
       .set({ locationId: null })
-      .where(eq(items.locationId, locationId))
+      .where(eq(invItems.locationId, locationId))
       .run();
 
-    await this.db.delete(locations).where(eq(locations.id, locationId)).run();
+    await this.db.delete(mdLocations).where(eq(mdLocations.id, locationId)).run();
     return { success: true };
   }
 

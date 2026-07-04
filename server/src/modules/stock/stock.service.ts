@@ -1,6 +1,6 @@
 import { Injectable, Inject, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { eq, and, sql, desc, count } from 'drizzle-orm';
-import { items, itemBatches, stockTransactions } from '../../db/schema';
+import { invItems, invItemBatches, invStockTransactions } from '../../db/schema';
 import { CreateItemDto, UpdateItemDto, ConsumeItemDto, TransferItemDto, AdjustItemDto, StockInItemDto, CreateBatchDto } from './dto/stock.dto';
 import { DATABASE_TOKEN } from '../../db/database.module';
 import type { Database, TransactionContext } from '../../db/types';
@@ -27,26 +27,26 @@ export class StockService {
     const limit = pagination?.limit ?? 20;
     const offset = (page - 1) * limit;
 
-    const conditions = [eq(items.familyId, familyId)];
+    const conditions = [eq(invItems.familyId, familyId)];
     if (query?.category) {
-      conditions.push(eq(items.type, query.category));
+      conditions.push(eq(invItems.type, query.category));
     }
     if (query?.location) {
-      conditions.push(eq(items.locationId, parseInt(query.location)));
+      conditions.push(eq(invItems.locationId, parseInt(query.location)));
     }
     if (query?.expiring) {
-      const deadline = daysFromNow(query.expiring);
-      conditions.push(sql`${items.expiryDate} <= ${deadline}`);
+      const deadline = Math.floor(daysFromNow(query.expiring) / 1000);
+      conditions.push(sql`${invItems.expiryDate} <= ${deadline}`);
     }
 
     const [{ total }] = await this.db
       .select({ total: count() })
-      .from(items)
+      .from(invItems)
       .where(and(...conditions));
 
     const data = await this.db
       .select()
-      .from(items)
+      .from(invItems)
       .where(and(...conditions))
       .limit(limit)
       .offset(offset);
@@ -55,14 +55,14 @@ export class StockService {
   }
 
   async getById(itemId: number): Promise<ItemSelect> {
-    const item = await this.db.select().from(items).where(eq(items.id, itemId)).get();
+    const item = await this.db.select().from(invItems).where(eq(invItems.id, itemId)).get();
     if (!item) throw new NotFoundException('物品不存在');
     return item as ItemSelect;
   }
 
   async create(familyId: number, dto: CreateItemDto, userId: number): Promise<ItemSelect> {
     return this.db.transaction((tx: TransactionContext) => {
-      const insertResult = tx.insert(items).values({
+      const insertResult = tx.insert(invItems).values({
         familyId,
         name: dto.name,
         type: dto.type || 'generic',
@@ -87,7 +87,7 @@ export class StockService {
 
       const itemId = Number(insertResult.lastInsertRowid);
 
-      tx.insert(stockTransactions).values({
+      tx.insert(invStockTransactions).values({
         itemId,
         type: 'add',
         quantity: dto.quantity ?? 1,
@@ -95,16 +95,16 @@ export class StockService {
         toLocationId: dto.locationId,
         userId,
         source: 'manual',
-      });
+      }).run();
 
       this.logger.log(`创建物品: ${dto.name} (ID: ${itemId}, 家庭: ${familyId})`);
-      return tx.select().from(items).where(eq(items.id, itemId)).get();
+      return tx.select().from(invItems).where(eq(invItems.id, itemId)).get();
     });
   }
 
   async update(itemId: number, familyId: number, dto: UpdateItemDto): Promise<ItemSelect> {
-    const item = await this.db.select().from(items)
-      .where(and(eq(items.id, itemId), eq(items.familyId, familyId)))
+    const item = await this.db.select().from(invItems)
+      .where(and(eq(invItems.id, itemId), eq(invItems.familyId, familyId)))
       .get();
     if (!item) throw new NotFoundException('物品不存在');
 
@@ -119,24 +119,25 @@ export class StockService {
     }
     (updates as Record<string, unknown>).updatedAt = new Date();
 
-    await this.db.update(items).set(updates as Partial<typeof items.$inferInsert>).where(eq(items.id, itemId)).run();
+    await this.db.update(invItems).set(updates as Partial<typeof invItems.$inferInsert>).where(eq(invItems.id, itemId)).run();
     return this.getById(itemId);
   }
 
   async delete(itemId: number, familyId: number) {
-    const item = await this.db.select().from(items)
-      .where(and(eq(items.id, itemId), eq(items.familyId, familyId)))
+    const item = await this.db.select().from(invItems)
+      .where(and(eq(invItems.id, itemId), eq(invItems.familyId, familyId)))
       .get();
     if (!item) throw new NotFoundException('物品不存在');
-    await this.db.delete(items).where(eq(items.id, itemId)).run();
+    await this.db.delete(invStockTransactions).where(eq(invStockTransactions.itemId, itemId)).run();
+    await this.db.delete(invItems).where(eq(invItems.id, itemId)).run();
     this.logger.log(`删除物品: ${item.name} (ID: ${itemId})`);
     return { success: true };
   }
 
   async consume(itemId: number, familyId: number, userId: number, dto: ConsumeItemDto): Promise<ItemSelect> {
     return this.db.transaction((tx: TransactionContext) => {
-      const item = tx.select().from(items)
-        .where(and(eq(items.id, itemId), eq(items.familyId, familyId)))
+      const item = tx.select().from(invItems)
+        .where(and(eq(invItems.id, itemId), eq(invItems.familyId, familyId)))
         .get();
       if (!item) throw new NotFoundException('物品不存在');
 
@@ -145,9 +146,9 @@ export class StockService {
       }
 
       const newQty = item.quantity - dto.quantity;
-      tx.update(items).set({ quantity: newQty, updatedAt: new Date() }).where(eq(items.id, itemId)).run();
+      tx.update(invItems).set({ quantity: newQty, updatedAt: new Date() }).where(eq(invItems.id, itemId)).run();
 
-      tx.insert(stockTransactions).values({
+      tx.insert(invStockTransactions).values({
         itemId,
         type: 'consume',
         quantity: dto.quantity,
@@ -156,17 +157,17 @@ export class StockService {
         userId,
         source: 'manual',
         note: dto.note,
-      });
+      }).run();
 
       this.logger.log(`消费物品: ${item.name} (ID: ${itemId}, 数量: ${dto.quantity})`);
-      return tx.select().from(items).where(eq(items.id, itemId)).get();
+      return tx.select().from(invItems).where(eq(invItems.id, itemId)).get();
     });
   }
 
   async stockIn(itemId: number, familyId: number, userId: number, dto: StockInItemDto): Promise<ItemSelect> {
     return this.db.transaction((tx: TransactionContext) => {
-      const item = tx.select().from(items)
-        .where(and(eq(items.id, itemId), eq(items.familyId, familyId)))
+      const item = tx.select().from(invItems)
+        .where(and(eq(invItems.id, itemId), eq(invItems.familyId, familyId)))
         .get();
       if (!item) throw new NotFoundException('物品不存在');
 
@@ -193,9 +194,9 @@ export class StockService {
         priceUpdates.maxPrice = Math.max(currentMax, dto.price);
       }
 
-      tx.update(items).set(priceUpdates).where(eq(items.id, itemId)).run();
+      tx.update(invItems).set(priceUpdates).where(eq(invItems.id, itemId)).run();
 
-      tx.insert(stockTransactions).values({
+      tx.insert(invStockTransactions).values({
         itemId,
         type: 'stock-in',
         quantity: dto.quantity,
@@ -204,27 +205,27 @@ export class StockService {
         userId,
         source: 'manual',
         note: dto.note,
-      });
+      }).run();
 
       this.logger.log(`入库物品: ${item.name} (ID: ${itemId}, 入库数量: ${dto.quantity})`);
-      return tx.select().from(items).where(eq(items.id, itemId)).get();
+      return tx.select().from(invItems).where(eq(invItems.id, itemId)).get();
     });
   }
 
   async transfer(itemId: number, familyId: number, userId: number, dto: TransferItemDto): Promise<ItemSelect> {
     return this.db.transaction((tx: TransactionContext) => {
-      const item = tx.select().from(items)
-        .where(and(eq(items.id, itemId), eq(items.familyId, familyId)))
+      const item = tx.select().from(invItems)
+        .where(and(eq(invItems.id, itemId), eq(invItems.familyId, familyId)))
         .get();
       if (!item) throw new NotFoundException('物品不存在');
 
       const quantity = dto.quantity ?? item.quantity;
-      tx.update(items)
+      tx.update(invItems)
         .set({ locationId: dto.toLocationId, updatedAt: new Date() })
-        .where(eq(items.id, itemId))
+        .where(eq(invItems.id, itemId))
         .run();
 
-      tx.insert(stockTransactions).values({
+      tx.insert(invStockTransactions).values({
         itemId,
         type: 'transfer',
         quantity,
@@ -233,25 +234,25 @@ export class StockService {
         toLocationId: dto.toLocationId,
         userId,
         source: 'manual',
-      });
+      }).run();
 
-      return tx.select().from(items).where(eq(items.id, itemId)).get();
+      return tx.select().from(invItems).where(eq(invItems.id, itemId)).get();
     });
   }
 
   async adjust(itemId: number, familyId: number, userId: number, dto: AdjustItemDto): Promise<ItemSelect> {
     return this.db.transaction((tx: TransactionContext) => {
-      const item = tx.select().from(items)
-        .where(and(eq(items.id, itemId), eq(items.familyId, familyId)))
+      const item = tx.select().from(invItems)
+        .where(and(eq(invItems.id, itemId), eq(invItems.familyId, familyId)))
         .get();
       if (!item) throw new NotFoundException('物品不存在');
 
-      tx.update(items)
+      tx.update(invItems)
         .set({ quantity: dto.quantity, updatedAt: new Date() })
-        .where(eq(items.id, itemId))
+        .where(eq(invItems.id, itemId))
         .run();
 
-      tx.insert(stockTransactions).values({
+      tx.insert(invStockTransactions).values({
         itemId,
         type: 'adjust',
         quantity: Math.abs(dto.quantity - item.quantity),
@@ -259,47 +260,48 @@ export class StockService {
         userId,
         source: 'manual',
         note: dto.note,
-      });
+      }).run();
 
-      return tx.select().from(items).where(eq(items.id, itemId)).get();
+      return tx.select().from(invItems).where(eq(invItems.id, itemId)).get();
     });
   }
 
   async getHistory(itemId: number) {
-    return this.db.select().from(stockTransactions)
-      .where(eq(stockTransactions.itemId, itemId))
-      .orderBy(desc(stockTransactions.createdAt))
+    return this.db.select().from(invStockTransactions)
+      .where(eq(invStockTransactions.itemId, itemId))
+      .orderBy(desc(invStockTransactions.createdAt))
       .all();
   }
 
   async getExpiring(familyId: number, days: number = 7) {
-    const deadline = daysFromNow(days);
-    return this.db.select().from(items)
+    const deadline = Math.floor(daysFromNow(days) / 1000);
+    const now = Math.floor(Date.now() / 1000);
+    return this.db.select().from(invItems)
       .where(and(
-        eq(items.familyId, familyId),
-        sql`${items.expiryDate} <= ${deadline}`,
-        sql`${items.expiryDate} > ${Date.now()}`,
+        eq(invItems.familyId, familyId),
+        sql`${invItems.expiryDate} <= ${deadline}`,
+        sql`${invItems.expiryDate} > ${now}`,
       ))
       .all();
   }
 
   async getSummary(familyId: number) {
     const totalItems = await this.db.select({ count: sql<number>`count(*)` })
-      .from(items).where(eq(items.familyId, familyId)).get();
+      .from(invItems).where(eq(invItems.familyId, familyId)).get();
 
     const expiringCount = await this.db.select({ count: sql<number>`count(*)` })
-      .from(items)
+      .from(invItems)
       .where(and(
-        eq(items.familyId, familyId),
-        sql`${items.expiryDate} <= ${daysFromNow(7)}`,
-        sql`${items.expiryDate} > ${Date.now()}`,
+        eq(invItems.familyId, familyId),
+        sql`${invItems.expiryDate} <= ${daysFromNow(7)}`,
+        sql`${invItems.expiryDate} > ${Date.now()}`,
       )).get();
 
     const expiredCount = await this.db.select({ count: sql<number>`count(*)` })
-      .from(items)
+      .from(invItems)
       .where(and(
-        eq(items.familyId, familyId),
-        sql`${items.expiryDate} <= ${Date.now()}`,
+        eq(invItems.familyId, familyId),
+        sql`${invItems.expiryDate} <= ${Date.now()}`,
       )).get();
 
     return {
@@ -320,18 +322,18 @@ export class StockService {
     const searchPattern = `%${query}%`;
 
     const conditions = [
-      eq(items.familyId, familyId),
-      sql`${items.name} LIKE ${searchPattern}`,
+      eq(invItems.familyId, familyId),
+      sql`${invItems.name} LIKE ${searchPattern}`,
     ];
 
     const [{ total }] = await this.db
       .select({ total: count() })
-      .from(items)
+      .from(invItems)
       .where(and(...conditions));
 
     const data = await this.db
       .select()
-      .from(items)
+      .from(invItems)
       .where(and(...conditions))
       .limit(limit)
       .offset(offset);
@@ -341,12 +343,12 @@ export class StockService {
 
   async createBatch(itemId: number, familyId: number, dto: CreateBatchDto): Promise<ItemBatchSelect> {
     return this.db.transaction((tx: TransactionContext) => {
-      const item = tx.select().from(items)
-        .where(and(eq(items.id, itemId), eq(items.familyId, familyId)))
+      const item = tx.select().from(invItems)
+        .where(and(eq(invItems.id, itemId), eq(invItems.familyId, familyId)))
         .get();
       if (!item) throw new NotFoundException('物品不存在');
 
-      const batchResult = tx.insert(itemBatches).values({
+      const batchResult = tx.insert(invItemBatches).values({
         itemId,
         batchNumber: dto.batchNumber,
         quantity: dto.quantity,
@@ -356,19 +358,19 @@ export class StockService {
         locationId: dto.locationId || item.locationId,
       }).run();
 
-      tx.update(items)
+      tx.update(invItems)
         .set({ quantity: item.quantity + dto.quantity, updatedAt: new Date() })
-        .where(eq(items.id, itemId))
+        .where(eq(invItems.id, itemId))
         .run();
 
       const batchId = Number(batchResult.lastInsertRowid);
-      return tx.select().from(itemBatches).where(eq(itemBatches.id, batchId)).get();
+      return tx.select().from(invItemBatches).where(eq(invItemBatches.id, batchId)).get();
     });
   }
 
   async listBatches(itemId: number) {
-    return this.db.select().from(itemBatches)
-      .where(eq(itemBatches.itemId, itemId))
+    return this.db.select().from(invItemBatches)
+      .where(eq(invItemBatches.itemId, itemId))
       .all();
   }
 

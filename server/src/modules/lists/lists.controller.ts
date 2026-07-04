@@ -48,7 +48,7 @@ export class ListsController {
     return this.listsService.delete(parseInt(id), req.user.familyId);
   }
 
-  @Post(':id/items')
+  @Post(':id/invItems')
   addItem(@Param('id') id: string, @Request() req: any, @Body() dto: AddListItemDto) {
     return this.listsService.addItem(parseInt(id), req.user.familyId, dto);
   }

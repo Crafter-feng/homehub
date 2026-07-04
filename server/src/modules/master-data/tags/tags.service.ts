@@ -1,7 +1,7 @@
 import { Injectable, Inject, NotFoundException } from '@nestjs/common';
 import { DATABASE_TOKEN } from '../../../db/database.module';
 import { eq, and } from 'drizzle-orm';
-import { tags, itemTags } from '../../../db/schema';
+import { mdTags, mdItemTags } from '../../../db/schema';
 
 export class CreateTagDto {
   name: string;
@@ -17,13 +17,13 @@ export class TagsService {
   ) {}
 
   async list(familyId: number) {
-    return this.db.select().from(tags)
-      .where(eq(tags.familyId, familyId))
+    return this.db.select().from(mdTags)
+      .where(eq(mdTags.familyId, familyId))
       .all();
   }
 
   async create(familyId: number, dto: CreateTagDto) {
-    return this.db.insert(tags).values({
+    return this.db.insert(mdTags).values({
       familyId,
       name: dto.name,
       icon: dto.icon,
@@ -33,8 +33,8 @@ export class TagsService {
   }
 
   async update(tagId: number, familyId: number, dto: { name?: string; icon?: string; color?: string; notes?: string }) {
-    const tag = await this.db.select().from(tags)
-      .where(and(eq(tags.id, tagId), eq(tags.familyId, familyId)))
+    const tag = await this.db.select().from(mdTags)
+      .where(and(eq(mdTags.id, tagId), eq(mdTags.familyId, familyId)))
       .get();
     if (!tag) throw new NotFoundException('标签不存在');
 
@@ -44,38 +44,38 @@ export class TagsService {
     if (dto.color) updates.color = dto.color;
     if (dto.notes !== undefined) updates.notes = dto.notes;
 
-    await this.db.update(tags).set(updates).where(eq(tags.id, tagId)).run();
-    return this.db.select().from(tags).where(eq(tags.id, tagId)).get();
+    await this.db.update(mdTags).set(updates).where(eq(mdTags.id, tagId)).run();
+    return this.db.select().from(mdTags).where(eq(mdTags.id, tagId)).get();
   }
 
   async delete(tagId: number, familyId: number) {
-    await this.db.delete(tags)
-      .where(and(eq(tags.id, tagId), eq(tags.familyId, familyId)))
+    await this.db.delete(mdTags)
+      .where(and(eq(mdTags.id, tagId), eq(mdTags.familyId, familyId)))
       .run();
     return { success: true };
   }
 
   async addToItem(itemId: number, tagId: number) {
-    await this.db.insert(itemTags).values({ itemId, tagId }).run();
+    await this.db.insert(mdItemTags).values({ itemId, tagId }).run();
     return { success: true };
   }
 
   async removeFromItem(itemId: number, tagId: number) {
-    await this.db.delete(itemTags)
-      .where(and(eq(itemTags.itemId, itemId), eq(itemTags.tagId, tagId)))
+    await this.db.delete(mdItemTags)
+      .where(and(eq(mdItemTags.itemId, itemId), eq(mdItemTags.tagId, tagId)))
       .run();
     return { success: true };
   }
 
   async getItemTags(itemId: number) {
     return this.db.select({
-      id: tags.id,
-      name: tags.name,
-      icon: tags.icon,
-      color: tags.color,
-    }).from(itemTags)
-      .innerJoin(tags, eq(itemTags.tagId, tags.id))
-      .where(eq(itemTags.itemId, itemId))
+      id: mdTags.id,
+      name: mdTags.name,
+      icon: mdTags.icon,
+      color: mdTags.color,
+    }).from(mdItemTags)
+      .innerJoin(mdTags, eq(mdItemTags.tagId, mdTags.id))
+      .where(eq(mdItemTags.itemId, itemId))
       .all();
   }
 }

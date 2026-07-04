@@ -1,7 +1,7 @@
 import { Injectable, Inject, NotFoundException } from '@nestjs/common';
 import { DATABASE_TOKEN } from '../../db/database.module';
 import { eq, and, sql, desc } from 'drizzle-orm';
-import { triggerBindings, scanLogs, automationTriggers } from '../../db/schema';
+import { sysTriggerBindings, sysScanLogs, sysAutomationTriggers } from '../../db/schema';
 import { CreateBindingDto, UpdateBindingDto, ScanEventDto, CreateAutomationDto } from './dto/trigger.dto';
 import { TriggerResolverService } from '../../plugins/core/trigger-resolver.service';
 import { ScanResult, ResolveContext, ResolvedAction } from '../../plugins/types/plugin.types';
@@ -15,26 +15,26 @@ export class TriggerService {
 
   // === 绑定管理 ===
   async listBindings(familyId: number, codeType?: string) {
-    let condition = eq(triggerBindings.familyId, familyId);
+    let condition = eq(sysTriggerBindings.familyId, familyId);
     if (codeType) {
-      condition = and(condition, eq(triggerBindings.codeType, codeType as any))!;
+      condition = and(condition, eq(sysTriggerBindings.codeType, codeType as any))!;
     }
-    return this.db.select().from(triggerBindings).where(condition).all();
+    return this.db.select().from(sysTriggerBindings).where(condition).all();
   }
 
   async getBindingById(bindingId: number) {
-    const binding = await this.db.select().from(triggerBindings)
-      .where(eq(triggerBindings.id, bindingId))
+    const binding = await this.db.select().from(sysTriggerBindings)
+      .where(eq(sysTriggerBindings.id, bindingId))
       .get();
     if (!binding) throw new NotFoundException('绑定不存在');
     return binding;
   }
 
   async lookupBinding(code: string, codeType: string) {
-    return this.db.select().from(triggerBindings)
+    return this.db.select().from(sysTriggerBindings)
       .where(and(
-        eq(triggerBindings.code, code),
-        eq(triggerBindings.codeType, codeType as any),
+        eq(sysTriggerBindings.code, code),
+        eq(sysTriggerBindings.codeType, codeType as any),
       ))
       .get();
   }
@@ -47,7 +47,7 @@ export class TriggerService {
       return this.updateBinding(existing.id, dto);
     }
 
-    return this.db.insert(triggerBindings).values({
+    return this.db.insert(sysTriggerBindings).values({
       familyId,
       code: dto.code,
       codeType: dto.codeType,
@@ -67,17 +67,17 @@ export class TriggerService {
     if (dto.actionOverride !== undefined) updates.actionOverride = dto.actionOverride;
     if (dto.label !== undefined) updates.label = dto.label;
 
-    await this.db.update(triggerBindings)
+    await this.db.update(sysTriggerBindings)
       .set(updates)
-      .where(eq(triggerBindings.id, bindingId))
+      .where(eq(sysTriggerBindings.id, bindingId))
       .run();
 
     return this.getBindingById(bindingId);
   }
 
   async deleteBinding(bindingId: number) {
-    await this.db.delete(triggerBindings)
-      .where(eq(triggerBindings.id, bindingId))
+    await this.db.delete(sysTriggerBindings)
+      .where(eq(sysTriggerBindings.id, bindingId))
       .run();
     return { success: true };
   }
@@ -101,12 +101,12 @@ export class TriggerService {
 
     // 2. Update read count if binding exists
     if (binding) {
-      await this.db.update(triggerBindings)
+      await this.db.update(sysTriggerBindings)
         .set({
           lastReadAt: new Date(),
-          readCount: sql`${triggerBindings.readCount} + 1`,
+          readCount: sql`${sysTriggerBindings.readCount} + 1`,
         })
-        .where(eq(triggerBindings.id, binding.id))
+        .where(eq(sysTriggerBindings.id, binding.id))
         .run();
     }
 
@@ -129,7 +129,7 @@ export class TriggerService {
     const resolvedAction = await this.resolver.resolve(scan, context, binding);
 
     // 6. Record scan log
-    await this.db.insert(scanLogs).values({
+    await this.db.insert(sysScanLogs).values({
       familyId,
       userId,
       scanType: dto.codeType as any,
@@ -158,8 +158,8 @@ export class TriggerService {
     if (!binding) return null;
     switch (binding.targetType) {
       case 'item': return `/stock/${binding.targetId}`;
-      case 'location': return `/locations/${binding.targetId}`;
-      case 'recipe': return `/recipes/${binding.targetId}`;
+      case 'location': return `/mdLocations/${binding.targetId}`;
+      case 'recipe': return `/hhRecipes/${binding.targetId}`;
       case 'action': return `/actions/${binding.targetId}`;
       default: return null;
     }
@@ -167,14 +167,14 @@ export class TriggerService {
 
   // === 自动化规则 ===
   async listAutomations(familyId: number) {
-    return this.db.select().from(automationTriggers)
-      .where(eq(automationTriggers.familyId, familyId))
-      .orderBy(automationTriggers.sortOrder)
+    return this.db.select().from(sysAutomationTriggers)
+      .where(eq(sysAutomationTriggers.familyId, familyId))
+      .orderBy(sysAutomationTriggers.sortOrder)
       .all();
   }
 
   async createAutomation(familyId: number, dto: CreateAutomationDto) {
-    return this.db.insert(automationTriggers).values({
+    return this.db.insert(sysAutomationTriggers).values({
       familyId,
       name: dto.name,
       triggerType: dto.triggerType as any,
@@ -186,42 +186,42 @@ export class TriggerService {
   }
 
   async updateAutomation(automationId: number, familyId: number, updates: Record<string, any>) {
-    await this.db.update(automationTriggers)
+    await this.db.update(sysAutomationTriggers)
       .set(updates)
       .where(and(
-        eq(automationTriggers.id, automationId),
-        eq(automationTriggers.familyId, familyId),
+        eq(sysAutomationTriggers.id, automationId),
+        eq(sysAutomationTriggers.familyId, familyId),
       ))
       .run();
 
-    return this.db.select().from(automationTriggers)
-      .where(eq(automationTriggers.id, automationId))
+    return this.db.select().from(sysAutomationTriggers)
+      .where(eq(sysAutomationTriggers.id, automationId))
       .get();
   }
 
   async deleteAutomation(automationId: number, familyId: number) {
-    await this.db.delete(automationTriggers)
+    await this.db.delete(sysAutomationTriggers)
       .where(and(
-        eq(automationTriggers.id, automationId),
-        eq(automationTriggers.familyId, familyId),
+        eq(sysAutomationTriggers.id, automationId),
+        eq(sysAutomationTriggers.familyId, familyId),
       ))
       .run();
     return { success: true };
   }
 
   async toggleAutomation(automationId: number, familyId: number) {
-    const automation = await this.db.select().from(automationTriggers)
+    const automation = await this.db.select().from(sysAutomationTriggers)
       .where(and(
-        eq(automationTriggers.id, automationId),
-        eq(automationTriggers.familyId, familyId),
+        eq(sysAutomationTriggers.id, automationId),
+        eq(sysAutomationTriggers.familyId, familyId),
       ))
       .get();
 
     if (!automation) throw new NotFoundException('自动化规则不存在');
 
-    await this.db.update(automationTriggers)
+    await this.db.update(sysAutomationTriggers)
       .set({ enabled: !automation.enabled })
-      .where(eq(automationTriggers.id, automationId))
+      .where(eq(sysAutomationTriggers.id, automationId))
       .run();
 
     return { ...automation, enabled: !automation.enabled };
@@ -276,7 +276,7 @@ export class TriggerService {
         triggerType: 'nfc_tap' as const,
         triggerConfig: { code: 'homehub://scene/shopping' },
         actionType: 'open_page' as const,
-        actionConfig: { page: '/lists?type=shopping' },
+        actionConfig: { page: '/hhLists?type=shopping' },
         sortOrder: 5,
       },
       {
@@ -311,15 +311,15 @@ export class TriggerService {
     const results: any[] = [];
     for (const preset of presets) {
       // Check if already exists by name
-      const existing = await this.db.select().from(automationTriggers)
+      const existing = await this.db.select().from(sysAutomationTriggers)
         .where(and(
-          eq(automationTriggers.familyId, familyId),
-          eq(automationTriggers.name, preset.name),
+          eq(sysAutomationTriggers.familyId, familyId),
+          eq(sysAutomationTriggers.name, preset.name),
         ))
         .get();
 
       if (!existing) {
-        const created = await this.db.insert(automationTriggers).values({
+        const created = await this.db.insert(sysAutomationTriggers).values({
           familyId,
           ...preset,
           enabled: true,
@@ -335,9 +335,9 @@ export class TriggerService {
 
   // === 扫描日志 ===
   async getScanLogs(familyId: number, limit: number = 50) {
-    return this.db.select().from(scanLogs)
-      .where(eq(scanLogs.familyId, familyId))
-      .orderBy(desc(scanLogs.createdAt))
+    return this.db.select().from(sysScanLogs)
+      .where(eq(sysScanLogs.familyId, familyId))
+      .orderBy(desc(sysScanLogs.createdAt))
       .limit(limit)
       .all();
   }

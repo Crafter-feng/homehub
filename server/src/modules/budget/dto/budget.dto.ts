@@ -37,7 +37,7 @@ export class CreateBudgetEntryDto {
 
   @IsArray()
   @IsOptional()
-  tags?: string[];
+  mdTags?: string[];
 
   @IsNumber()
   @IsOptional()
@@ -86,7 +86,7 @@ export class UpdateBudgetEntryDto {
 
   @IsArray()
   @IsOptional()
-  tags?: string[];
+  mdTags?: string[];
 
   @IsString()
   @IsOptional()

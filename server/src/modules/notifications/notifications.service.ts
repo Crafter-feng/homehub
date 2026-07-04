@@ -1,7 +1,7 @@
 import { Injectable, Inject, NotFoundException } from '@nestjs/common';
 import { DATABASE_TOKEN } from '../../db/database.module';
 import { eq, and, sql, desc } from 'drizzle-orm';
-import { notificationRules, notifications, items } from '../../db/schema';
+import { sysNotificationRules, sysNotifications, invItems } from '../../db/schema';
 import { CreateNotificationRuleDto, UpdateNotificationRuleDto } from './dto/notification.dto';
 import * as http from 'http';
 import * as https from 'https';
@@ -14,13 +14,13 @@ export class NotificationsService {
 
   // === 通知规则管理 ===
   async listRules(familyId: number) {
-    return this.db.select().from(notificationRules)
-      .where(eq(notificationRules.familyId, familyId))
+    return this.db.select().from(sysNotificationRules)
+      .where(eq(sysNotificationRules.familyId, familyId))
       .all();
   }
 
   async createRule(familyId: number, dto: CreateNotificationRuleDto) {
-    return this.db.insert(notificationRules).values({
+    return this.db.insert(sysNotificationRules).values({
       familyId,
       name: dto.name,
       triggerType: dto.triggerType,
@@ -32,8 +32,8 @@ export class NotificationsService {
   }
 
   async updateRule(ruleId: number, familyId: number, dto: UpdateNotificationRuleDto) {
-    const rule = await this.db.select().from(notificationRules)
-      .where(and(eq(notificationRules.id, ruleId), eq(notificationRules.familyId, familyId)))
+    const rule = await this.db.select().from(sysNotificationRules)
+      .where(and(eq(sysNotificationRules.id, ruleId), eq(sysNotificationRules.familyId, familyId)))
       .get();
     if (!rule) throw new NotFoundException('通知规则不存在');
 
@@ -42,31 +42,31 @@ export class NotificationsService {
     if (dto.config) updates.config = dto.config;
     if (dto.enabled !== undefined) updates.enabled = dto.enabled;
 
-    await this.db.update(notificationRules).set(updates)
-      .where(eq(notificationRules.id, ruleId))
+    await this.db.update(sysNotificationRules).set(updates)
+      .where(eq(sysNotificationRules.id, ruleId))
       .run();
 
-    return this.db.select().from(notificationRules)
-      .where(eq(notificationRules.id, ruleId))
+    return this.db.select().from(sysNotificationRules)
+      .where(eq(sysNotificationRules.id, ruleId))
       .get();
   }
 
   async deleteRule(ruleId: number, familyId: number) {
-    await this.db.delete(notificationRules)
-      .where(and(eq(notificationRules.id, ruleId), eq(notificationRules.familyId, familyId)))
+    await this.db.delete(sysNotificationRules)
+      .where(and(eq(sysNotificationRules.id, ruleId), eq(sysNotificationRules.familyId, familyId)))
       .run();
     return { success: true };
   }
 
   async toggleRule(ruleId: number, familyId: number) {
-    const rule = await this.db.select().from(notificationRules)
-      .where(and(eq(notificationRules.id, ruleId), eq(notificationRules.familyId, familyId)))
+    const rule = await this.db.select().from(sysNotificationRules)
+      .where(and(eq(sysNotificationRules.id, ruleId), eq(sysNotificationRules.familyId, familyId)))
       .get();
     if (!rule) throw new NotFoundException('通知规则不存在');
 
-    await this.db.update(notificationRules)
+    await this.db.update(sysNotificationRules)
       .set({ enabled: !rule.enabled })
-      .where(eq(notificationRules.id, ruleId))
+      .where(eq(sysNotificationRules.id, ruleId))
       .run();
 
     return { ...rule, enabled: !rule.enabled };
@@ -75,26 +75,26 @@ export class NotificationsService {
   // === 通知管理 ===
   async listNotifications(userId: number, familyId: number, unreadOnly: boolean = false) {
     let condition = and(
-      eq(notifications.familyId, familyId),
-      eq(notifications.userId, userId),
+      eq(sysNotifications.familyId, familyId),
+      eq(sysNotifications.userId, userId),
     );
     if (unreadOnly) {
-      condition = and(condition, eq(notifications.isRead, false))!;
+      condition = and(condition, eq(sysNotifications.isRead, false))!;
     }
 
-    return this.db.select().from(notifications)
+    return this.db.select().from(sysNotifications)
       .where(condition)
-      .orderBy(desc(notifications.createdAt))
+      .orderBy(desc(sysNotifications.createdAt))
       .all();
   }
 
   async getUnreadCount(userId: number, familyId: number) {
     const result = await this.db.select({ count: sql<number>`count(*)` })
-      .from(notifications)
+      .from(sysNotifications)
       .where(and(
-        eq(notifications.familyId, familyId),
-        eq(notifications.userId, userId),
-        eq(notifications.isRead, false),
+        eq(sysNotifications.familyId, familyId),
+        eq(sysNotifications.userId, userId),
+        eq(sysNotifications.isRead, false),
       ))
       .get();
 
@@ -102,23 +102,23 @@ export class NotificationsService {
   }
 
   async markAsRead(notificationId: number, userId: number) {
-    await this.db.update(notifications)
+    await this.db.update(sysNotifications)
       .set({ isRead: true })
       .where(and(
-        eq(notifications.id, notificationId),
-        eq(notifications.userId, userId),
+        eq(sysNotifications.id, notificationId),
+        eq(sysNotifications.userId, userId),
       ))
       .run();
     return { success: true };
   }
 
   async markAllAsRead(userId: number, familyId: number) {
-    await this.db.update(notifications)
+    await this.db.update(sysNotifications)
       .set({ isRead: true })
       .where(and(
-        eq(notifications.familyId, familyId),
-        eq(notifications.userId, userId),
-        eq(notifications.isRead, false),
+        eq(sysNotifications.familyId, familyId),
+        eq(sysNotifications.userId, userId),
+        eq(sysNotifications.isRead, false),
       ))
       .run();
     return { success: true };
@@ -133,7 +133,7 @@ export class NotificationsService {
     relatedType?: string;
     relatedId?: number;
   }) {
-    return this.db.insert(notifications).values({
+    return this.db.insert(sysNotifications).values({
       familyId: data.familyId,
       userId: data.userId,
       title: data.title,
@@ -146,27 +146,27 @@ export class NotificationsService {
 
   // === 检查过期物品并生成通知 ===
   async checkExpiringItems(familyId: number) {
-    const rules = await this.db.select().from(notificationRules)
+    const rules = await this.db.select().from(sysNotificationRules)
       .where(and(
-        eq(notificationRules.familyId, familyId),
-        eq(notificationRules.triggerType, 'expiry'),
-        eq(notificationRules.enabled, true),
+        eq(sysNotificationRules.familyId, familyId),
+        eq(sysNotificationRules.triggerType, 'expiry'),
+        eq(sysNotificationRules.enabled, true),
       ))
       .all();
 
-    // Query expiring items
-    const expiringItems = await this.db.select().from(items)
+    // Query expiring invItems
+    const expiringItems = await this.db.select().from(invItems)
       .where(and(
-        eq(items.familyId, familyId),
-        sql`${items.expiryDate} > ${Date.now()}`,
-        sql`${items.expiryDate} <= ${Date.now() + 7 * 86400000}`,
+        eq(invItems.familyId, familyId),
+        sql`${invItems.expiryDate} > ${Date.now()}`,
+        sql`${invItems.expiryDate} <= ${Date.now() + 7 * 86400000}`,
       ))
       .all();
 
-    const expiredItems = await this.db.select().from(items)
+    const expiredItems = await this.db.select().from(invItems)
       .where(and(
-        eq(items.familyId, familyId),
-        sql`${items.expiryDate} <= ${Date.now()}`,
+        eq(invItems.familyId, familyId),
+        sql`${invItems.expiryDate} <= ${Date.now()}`,
       ))
       .all();
 

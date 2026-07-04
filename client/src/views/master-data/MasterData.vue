@@ -252,39 +252,6 @@ const tagForm = reactive({ name: '', icon: '', color: '#409EFF', notes: '' });
 const unitForm = reactive({ name: '', parentId: null as number | null, conversionFactor: 1, notes: '' });
 const typeForm = reactive({ name: '', icon: '', notes: '' });
 
-// 动态选项（从系统数据读取 + 末尾"新建"选项）
-const typeOptionsForSelect = computed(() =>
-  types.value.map(t => ({ label: t.icon ? `${isEmojiIcon(t.icon) ? t.icon : ''} ${t.name}`.trim() : t.name, value: t.name }))
-);
-const typeOptionsWithNew = computed(() => [
-  ...typeOptionsForSelect.value,
-  { label: t('masterData.newCategory'), value: '__new__type' },
-]);
-
-const brandOptionsForSelect = computed(() =>
-  brands.value.map(b => ({ label: b.name, value: b.name }))
-);
-const brandOptionsWithNew = computed(() => [
-  ...brandOptionsForSelect.value,
-  { label: t('masterData.newBrand'), value: '__new__brand' },
-]);
-
-const unitOptionsForSelect = computed(() =>
-  units.value.map(u => ({ label: u.name, value: u.name }))
-);
-const unitOptionsWithNew = computed(() => [
-  ...unitOptionsForSelect.value,
-  { label: t('masterData.newUnit'), value: '__new__unit' },
-]);
-
-const tagOptionsForSelect = computed(() =>
-  tags.value.map(t => ({ label: t.icon ? `${isEmojiIcon(t.icon) ? t.icon : ''} ${t.name}`.trim() : t.name, value: t.name }))
-);
-const tagOptionsWithNew = computed(() => [
-  ...tagOptionsForSelect.value,
-  { label: t('masterData.newTag'), value: '__new__tag' },
-]);
-
 const parentOptions = computed(() =>
   locations.value.filter(l => !l.parentId).map(l => ({ label: l.name, value: l.id }))
 );

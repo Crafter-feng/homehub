@@ -1,7 +1,7 @@
 import { Injectable, Inject, NotFoundException } from '@nestjs/common';
 import { DATABASE_TOKEN } from '../../db/database.module';
 import { eq, and, sql, desc, gte, lte, between } from 'drizzle-orm';
-import { budgetEntries, budgetCategories, budgetSubscriptions } from '../../db/schema/budget';
+import { hhBudgetEntries, hhBudgetCategories, hhBudgetSubscriptions } from '../../db/schema';
 import {
   CreateBudgetEntryDto,
   UpdateBudgetEntryDto,
@@ -28,30 +28,30 @@ export class BudgetService {
     page?: number;
     limit?: number;
   }) {
-    let condition = eq(budgetEntries.familyId, familyId);
-    if (params?.type) condition = and(condition, eq(budgetEntries.type, params.type as any))!;
-    if (params?.category) condition = and(condition, eq(budgetEntries.category, params.category))!;
+    let condition = eq(hhBudgetEntries.familyId, familyId);
+    if (params?.type) condition = and(condition, eq(hhBudgetEntries.type, params.type as any))!;
+    if (params?.category) condition = and(condition, eq(hhBudgetEntries.category, params.category))!;
     if (params?.startDate && params?.endDate) {
-      condition = and(condition, between(budgetEntries.date, new Date(params.startDate), new Date(params.endDate)))!;
+      condition = and(condition, between(hhBudgetEntries.date, new Date(params.startDate), new Date(params.endDate)))!;
     } else if (params?.startDate) {
-      condition = and(condition, gte(budgetEntries.date, new Date(params.startDate)))!;
+      condition = and(condition, gte(hhBudgetEntries.date, new Date(params.startDate)))!;
     } else if (params?.endDate) {
-      condition = and(condition, lte(budgetEntries.date, new Date(params.endDate)))!;
+      condition = and(condition, lte(hhBudgetEntries.date, new Date(params.endDate)))!;
     }
 
     const page = params?.page || 1;
     const limit = params?.limit || 50;
     const offset = (page - 1) * limit;
 
-    const entries = await this.db.select().from(budgetEntries)
+    const entries = await this.db.select().from(hhBudgetEntries)
       .where(condition)
-      .orderBy(desc(budgetEntries.date))
+      .orderBy(desc(hhBudgetEntries.date))
       .limit(limit)
       .offset(offset)
       .all();
 
     const countResult = await this.db.select({ count: sql<number>`count(*)` })
-      .from(budgetEntries)
+      .from(hhBudgetEntries)
       .where(condition)
       .get();
 
@@ -59,15 +59,15 @@ export class BudgetService {
   }
 
   async getEntryById(id: number, familyId: number) {
-    const entry = await this.db.select().from(budgetEntries)
-      .where(and(eq(budgetEntries.id, id), eq(budgetEntries.familyId, familyId)))
+    const entry = await this.db.select().from(hhBudgetEntries)
+      .where(and(eq(hhBudgetEntries.id, id), eq(hhBudgetEntries.familyId, familyId)))
       .get();
     if (!entry) throw new NotFoundException('预算条目不存在');
     return entry;
   }
 
   async createEntry(familyId: number, dto: CreateBudgetEntryDto) {
-    return this.db.insert(budgetEntries).values({
+    return this.db.insert(hhBudgetEntries).values({
       familyId,
       type: dto.type,
       amount: dto.amount,
@@ -77,7 +77,7 @@ export class BudgetService {
       date: new Date(dto.date),
       isRecurring: dto.isRecurring || false,
       recurringConfig: dto.recurringConfig,
-      tags: dto.tags,
+      mdTags: dto.mdTags,
       relatedItemId: dto.relatedItemId,
       notes: dto.notes,
     }).returning().get();
@@ -94,16 +94,16 @@ export class BudgetService {
     if (dto.date) updates.date = new Date(dto.date);
     if (dto.isRecurring !== undefined) updates.isRecurring = dto.isRecurring;
     if (dto.recurringConfig) updates.recurringConfig = dto.recurringConfig;
-    if (dto.tags) updates.tags = dto.tags;
+    if (dto.mdTags) updates.mdTags = dto.mdTags;
     if (dto.notes !== undefined) updates.notes = dto.notes;
 
-    await this.db.update(budgetEntries).set(updates).where(eq(budgetEntries.id, id)).run();
+    await this.db.update(hhBudgetEntries).set(updates).where(eq(hhBudgetEntries.id, id)).run();
     return this.getEntryById(id, familyId);
   }
 
   async deleteEntry(id: number, familyId: number) {
     const entry = await this.getEntryById(id, familyId);
-    await this.db.delete(budgetEntries).where(eq(budgetEntries.id, id)).run();
+    await this.db.delete(hhBudgetEntries).where(eq(hhBudgetEntries.id, id)).run();
     return { deleted: true };
   }
 
@@ -112,44 +112,44 @@ export class BudgetService {
   // ═══════════════════════════════════════
 
   async getSummary(familyId: number, startDate?: Date, endDate?: Date) {
-    let condition = eq(budgetEntries.familyId, familyId);
+    let condition = eq(hhBudgetEntries.familyId, familyId);
     if (startDate && endDate) {
-      condition = and(condition, between(budgetEntries.date, startDate, endDate))!;
+      condition = and(condition, between(hhBudgetEntries.date, startDate, endDate))!;
     } else if (startDate) {
-      condition = and(condition, gte(budgetEntries.date, startDate))!;
+      condition = and(condition, gte(hhBudgetEntries.date, startDate))!;
     } else if (endDate) {
-      condition = and(condition, lte(budgetEntries.date, endDate))!;
+      condition = and(condition, lte(hhBudgetEntries.date, endDate))!;
     }
 
     const totalIncome = await this.db.select({
-      total: sql<number>`coalesce(sum(${budgetEntries.amount}), 0)`,
-    }).from(budgetEntries)
-      .where(and(condition, eq(budgetEntries.type, 'income')))
+      total: sql<number>`coalesce(sum(${hhBudgetEntries.amount}), 0)`,
+    }).from(hhBudgetEntries)
+      .where(and(condition, eq(hhBudgetEntries.type, 'income')))
       .get();
 
     const totalExpense = await this.db.select({
-      total: sql<number>`coalesce(sum(${budgetEntries.amount}), 0)`,
-    }).from(budgetEntries)
-      .where(and(condition, eq(budgetEntries.type, 'expense')))
+      total: sql<number>`coalesce(sum(${hhBudgetEntries.amount}), 0)`,
+    }).from(hhBudgetEntries)
+      .where(and(condition, eq(hhBudgetEntries.type, 'expense')))
       .get();
 
     const byCategory = await this.db.select({
-      category: budgetEntries.category,
-      type: budgetEntries.type,
-      total: sql<number>`sum(${budgetEntries.amount})`,
+      category: hhBudgetEntries.category,
+      type: hhBudgetEntries.type,
+      total: sql<number>`sum(${hhBudgetEntries.amount})`,
       count: sql<number>`count(*)`,
-    }).from(budgetEntries)
+    }).from(hhBudgetEntries)
       .where(condition)
-      .groupBy(budgetEntries.category, budgetEntries.type)
+      .groupBy(hhBudgetEntries.category, hhBudgetEntries.type)
       .all();
 
     const monthlyTrend = await this.db.select({
-      month: sql<string>`strftime('%Y-%m', ${budgetEntries.date})`,
-      income: sql<number>`coalesce(sum(case when ${budgetEntries.type} = 'income' then ${budgetEntries.amount} else 0 end), 0)`,
-      expense: sql<number>`coalesce(sum(case when ${budgetEntries.type} = 'expense' then ${budgetEntries.amount} else 0 end), 0)`,
-    }).from(budgetEntries)
+      month: sql<string>`strftime('%Y-%m', ${hhBudgetEntries.date})`,
+      income: sql<number>`coalesce(sum(case when ${hhBudgetEntries.type} = 'income' then ${hhBudgetEntries.amount} else 0 end), 0)`,
+      expense: sql<number>`coalesce(sum(case when ${hhBudgetEntries.type} = 'expense' then ${hhBudgetEntries.amount} else 0 end), 0)`,
+    }).from(hhBudgetEntries)
       .where(condition)
-      .groupBy(sql`strftime('%Y-%m', ${budgetEntries.date})`)
+      .groupBy(sql`strftime('%Y-%m', ${hhBudgetEntries.date})`)
       .all();
 
     return {
@@ -162,9 +162,9 @@ export class BudgetService {
   }
 
   async getRecentEntries(familyId: number, limit = 10) {
-    return this.db.select().from(budgetEntries)
-      .where(eq(budgetEntries.familyId, familyId))
-      .orderBy(desc(budgetEntries.date))
+    return this.db.select().from(hhBudgetEntries)
+      .where(eq(hhBudgetEntries.familyId, familyId))
+      .orderBy(desc(hhBudgetEntries.date))
       .limit(limit)
       .all();
   }
@@ -174,16 +174,16 @@ export class BudgetService {
   // ═══════════════════════════════════════
 
   async listCategories(familyId: number, type?: string) {
-    let condition = eq(budgetCategories.familyId, familyId);
-    if (type) condition = and(condition, eq(budgetCategories.type, type as any))!;
-    return this.db.select().from(budgetCategories)
+    let condition = eq(hhBudgetCategories.familyId, familyId);
+    if (type) condition = and(condition, eq(hhBudgetCategories.type, type as any))!;
+    return this.db.select().from(hhBudgetCategories)
       .where(condition)
-      .orderBy(budgetCategories.sortOrder)
+      .orderBy(hhBudgetCategories.sortOrder)
       .all();
   }
 
   async createCategory(familyId: number, dto: CreateBudgetCategoryDto) {
-    return this.db.insert(budgetCategories).values({
+    return this.db.insert(hhBudgetCategories).values({
       familyId,
       name: dto.name,
       type: dto.type,
@@ -194,11 +194,11 @@ export class BudgetService {
   }
 
   async deleteCategory(id: number, familyId: number) {
-    const cat = await this.db.select().from(budgetCategories)
-      .where(and(eq(budgetCategories.id, id), eq(budgetCategories.familyId, familyId)))
+    const cat = await this.db.select().from(hhBudgetCategories)
+      .where(and(eq(hhBudgetCategories.id, id), eq(hhBudgetCategories.familyId, familyId)))
       .get();
     if (!cat) throw new NotFoundException('分类不存在');
-    await this.db.delete(budgetCategories).where(eq(budgetCategories.id, id)).run();
+    await this.db.delete(hhBudgetCategories).where(eq(hhBudgetCategories.id, id)).run();
     return { deleted: true };
   }
 
@@ -207,14 +207,14 @@ export class BudgetService {
   // ═══════════════════════════════════════
 
   async listSubscriptions(familyId: number) {
-    return this.db.select().from(budgetSubscriptions)
-      .where(eq(budgetSubscriptions.familyId, familyId))
-      .orderBy(budgetSubscriptions.nextBillingDate)
+    return this.db.select().from(hhBudgetSubscriptions)
+      .where(eq(hhBudgetSubscriptions.familyId, familyId))
+      .orderBy(hhBudgetSubscriptions.nextBillingDate)
       .all();
   }
 
   async createSubscription(familyId: number, dto: CreateSubscriptionDto) {
-    return this.db.insert(budgetSubscriptions).values({
+    return this.db.insert(hhBudgetSubscriptions).values({
       familyId,
       name: dto.name,
       amount: dto.amount,
@@ -229,8 +229,8 @@ export class BudgetService {
   }
 
   async updateSubscription(id: number, familyId: number, dto: UpdateSubscriptionDto) {
-    const sub = await this.db.select().from(budgetSubscriptions)
-      .where(and(eq(budgetSubscriptions.id, id), eq(budgetSubscriptions.familyId, familyId)))
+    const sub = await this.db.select().from(hhBudgetSubscriptions)
+      .where(and(eq(hhBudgetSubscriptions.id, id), eq(hhBudgetSubscriptions.familyId, familyId)))
       .get();
     if (!sub) throw new NotFoundException('订阅不存在');
 
@@ -245,24 +245,24 @@ export class BudgetService {
     if (dto.notes !== undefined) updates.notes = dto.notes;
     if (dto.isEnabled !== undefined) updates.isEnabled = dto.isEnabled;
 
-    await this.db.update(budgetSubscriptions).set(updates).where(eq(budgetSubscriptions.id, id)).run();
-    const updated = await this.db.select().from(budgetSubscriptions)
-      .where(eq(budgetSubscriptions.id, id)).get();
+    await this.db.update(hhBudgetSubscriptions).set(updates).where(eq(hhBudgetSubscriptions.id, id)).run();
+    const updated = await this.db.select().from(hhBudgetSubscriptions)
+      .where(eq(hhBudgetSubscriptions.id, id)).get();
     return updated;
   }
 
   async deleteSubscription(id: number, familyId: number) {
-    const sub = await this.db.select().from(budgetSubscriptions)
-      .where(and(eq(budgetSubscriptions.id, id), eq(budgetSubscriptions.familyId, familyId)))
+    const sub = await this.db.select().from(hhBudgetSubscriptions)
+      .where(and(eq(hhBudgetSubscriptions.id, id), eq(hhBudgetSubscriptions.familyId, familyId)))
       .get();
     if (!sub) throw new NotFoundException('订阅不存在');
-    await this.db.delete(budgetSubscriptions).where(eq(budgetSubscriptions.id, id)).run();
+    await this.db.delete(hhBudgetSubscriptions).where(eq(hhBudgetSubscriptions.id, id)).run();
     return { deleted: true };
   }
 
   async getMonthlySubscriptionCost(familyId: number) {
-    const subs = await this.db.select().from(budgetSubscriptions)
-      .where(and(eq(budgetSubscriptions.familyId, familyId), eq(budgetSubscriptions.isEnabled, true)))
+    const subs = await this.db.select().from(hhBudgetSubscriptions)
+      .where(and(eq(hhBudgetSubscriptions.familyId, familyId), eq(hhBudgetSubscriptions.isEnabled, true)))
       .all();
 
     let monthlyTotal = 0;

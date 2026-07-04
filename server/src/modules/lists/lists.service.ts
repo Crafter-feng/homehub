@@ -1,8 +1,8 @@
 import { Injectable, Inject, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { DATABASE_TOKEN } from '../../db/database.module';
 import { eq, and, sql, desc } from 'drizzle-orm';
-import { lists, listItems, listItemComments, holidayTemplates } from '../../db/schema';
-import { items } from '../../db/schema/stock';
+import { hhLists, hhListItems, hhListItemComments, hhHolidayTemplates } from '../../db/schema';
+import { invItems } from '../../db/schema';
 import { CreateListDto, UpdateListDto, AddListItemDto, UpdateListItemDto, AssignListItemDto, AddCommentDto } from './dto/list.dto';
 
 @Injectable()
@@ -13,29 +13,29 @@ export class ListsService {
 
   // === 清单管理 ===
   async list(familyId: number, type?: string) {
-    let condition = eq(lists.familyId, familyId);
+    let condition = eq(hhLists.familyId, familyId);
     if (type) {
-      condition = and(condition, eq(lists.type, type as any))!;
+      condition = and(condition, eq(hhLists.type, type as any))!;
     }
-    return this.db.select().from(lists).where(condition).all();
+    return this.db.select().from(hhLists).where(condition).all();
   }
 
   async getById(listId: number, familyId: number) {
-    const list = await this.db.select().from(lists)
-      .where(and(eq(lists.id, listId), eq(lists.familyId, familyId)))
+    const list = await this.db.select().from(hhLists)
+      .where(and(eq(hhLists.id, listId), eq(hhLists.familyId, familyId)))
       .get();
     if (!list) throw new NotFoundException('清单不存在');
 
-    const items = await this.db.select().from(listItems)
-      .where(eq(listItems.listId, listId))
-      .orderBy(listItems.sortOrder)
+    const invItems = await this.db.select().from(hhListItems)
+      .where(eq(hhListItems.listId, listId))
+      .orderBy(hhListItems.sortOrder)
       .all();
 
-    return { ...list, items };
+    return { ...list, invItems };
   }
 
   async create(familyId: number, userId: number, dto: CreateListDto) {
-    return this.db.insert(lists).values({
+    return this.db.insert(hhLists).values({
       familyId,
       name: dto.name,
       type: dto.type,
@@ -45,8 +45,8 @@ export class ListsService {
   }
 
   async update(listId: number, familyId: number, dto: UpdateListDto) {
-    const list = await this.db.select().from(lists)
-      .where(and(eq(lists.id, listId), eq(lists.familyId, familyId)))
+    const list = await this.db.select().from(hhLists)
+      .where(and(eq(hhLists.id, listId), eq(hhLists.familyId, familyId)))
       .get();
     if (!list) throw new NotFoundException('清单不存在');
 
@@ -55,43 +55,43 @@ export class ListsService {
     if (dto.config) updates.config = dto.config;
     if (dto.isArchived !== undefined) updates.isArchived = dto.isArchived;
 
-    await this.db.update(lists).set(updates).where(eq(lists.id, listId)).run();
+    await this.db.update(hhLists).set(updates).where(eq(hhLists.id, listId)).run();
     return this.getById(listId, familyId);
   }
 
   async delete(listId: number, familyId: number) {
-    await this.db.delete(lists)
-      .where(and(eq(lists.id, listId), eq(lists.familyId, familyId)))
+    await this.db.delete(hhLists)
+      .where(and(eq(hhLists.id, listId), eq(hhLists.familyId, familyId)))
       .run();
     return { success: true };
   }
 
   async getMyTasks(userId: number, familyId: number) {
     return this.db.select({
-      id: listItems.id,
-      content: listItems.content,
-      status: listItems.status,
-      dueAt: listItems.dueAt,
-      listName: lists.name,
-      listType: lists.type,
-    }).from(listItems)
-      .innerJoin(lists, eq(listItems.listId, lists.id))
+      id: hhListItems.id,
+      content: hhListItems.content,
+      status: hhListItems.status,
+      dueAt: hhListItems.dueAt,
+      listName: hhLists.name,
+      listType: hhLists.type,
+    }).from(hhListItems)
+      .innerJoin(hhLists, eq(hhListItems.listId, hhLists.id))
       .where(and(
-        eq(listItems.assigneeId, userId),
-        eq(listItems.status, 'pending'),
-        eq(lists.familyId, familyId),
+        eq(hhListItems.assigneeId, userId),
+        eq(hhListItems.status, 'pending'),
+        eq(hhLists.familyId, familyId),
       ))
       .all();
   }
 
   // === 清单条目管理 ===
   async addItem(listId: number, familyId: number, dto: AddListItemDto) {
-    const list = await this.db.select().from(lists)
-      .where(and(eq(lists.id, listId), eq(lists.familyId, familyId)))
+    const list = await this.db.select().from(hhLists)
+      .where(and(eq(hhLists.id, listId), eq(hhLists.familyId, familyId)))
       .get();
     if (!list) throw new NotFoundException('清单不存在');
 
-    return this.db.insert(listItems).values({
+    return this.db.insert(hhListItems).values({
       listId,
       content: dto.content,
       notes: dto.notes,
@@ -105,8 +105,8 @@ export class ListsService {
   }
 
   async updateItem(itemId: number, dto: UpdateListItemDto) {
-    const item = await this.db.select().from(listItems)
-      .where(eq(listItems.id, itemId))
+    const item = await this.db.select().from(hhListItems)
+      .where(eq(hhListItems.id, itemId))
       .get();
     if (!item) throw new NotFoundException('条目不存在');
 
@@ -117,42 +117,42 @@ export class ListsService {
     if (dto.unit) updates.unit = dto.unit;
     if (dto.dueAt !== undefined) updates.dueAt = dto.dueAt ? new Date(dto.dueAt) : null;
 
-    await this.db.update(listItems).set(updates).where(eq(listItems.id, itemId)).run();
-    return this.db.select().from(listItems).where(eq(listItems.id, itemId)).get();
+    await this.db.update(hhListItems).set(updates).where(eq(hhListItems.id, itemId)).run();
+    return this.db.select().from(hhListItems).where(eq(hhListItems.id, itemId)).get();
   }
 
   async deleteItem(itemId: number) {
-    await this.db.delete(listItems).where(eq(listItems.id, itemId)).run();
+    await this.db.delete(hhListItems).where(eq(hhListItems.id, itemId)).run();
     return { success: true };
   }
 
   async checkItem(itemId: number, userId: number) {
-    const item = await this.db.select().from(listItems)
-      .where(eq(listItems.id, itemId))
+    const item = await this.db.select().from(hhListItems)
+      .where(eq(hhListItems.id, itemId))
       .get();
     if (!item) throw new NotFoundException('条目不存在');
 
-    const list = await this.db.select().from(lists)
-      .where(eq(lists.id, item.listId))
+    const list = await this.db.select().from(hhLists)
+      .where(eq(hhLists.id, item.listId))
       .get();
 
     // 更新条目状态
-    await this.db.update(listItems).set({
+    await this.db.update(hhListItems).set({
       status: 'completed',
       completedBy: userId,
       completedAt: new Date(),
-    }).where(eq(listItems.id, itemId)).run();
+    }).where(eq(hhListItems.id, itemId)).run();
 
     // 购物清单：打勾自动入库
     if (list?.type === 'shopping' && item.linkedItemId) {
-      const stockItem = await this.db.select().from(items)
-        .where(eq(items.id, item.linkedItemId))
+      const stockItem = await this.db.select().from(invItems)
+        .where(eq(invItems.id, item.linkedItemId))
         .get();
       if (stockItem) {
-        await this.db.update(items).set({
+        await this.db.update(invItems).set({
           quantity: stockItem.quantity + (item.quantity || 1),
           updatedAt: new Date(),
-        }).where(eq(items.id, item.linkedItemId)).run();
+        }).where(eq(invItems.id, item.linkedItemId)).run();
       }
     }
 
@@ -166,40 +166,40 @@ export class ListsService {
         else if (config.autoReset === 'weekly') resetDate.setDate(resetDate.getDate() + 7);
         else if (config.autoReset === 'monthly') resetDate.setMonth(resetDate.getMonth() + 1);
 
-        await this.db.update(listItems).set({
+        await this.db.update(hhListItems).set({
           status: 'pending',
           completedBy: null,
           completedAt: null,
           dueAt: resetDate,
           lastResetAt: now,
-        }).where(eq(listItems.id, itemId)).run();
+        }).where(eq(hhListItems.id, itemId)).run();
       }
     }
 
-    return this.db.select().from(listItems).where(eq(listItems.id, itemId)).get();
+    return this.db.select().from(hhListItems).where(eq(hhListItems.id, itemId)).get();
   }
 
   async uncheckItem(itemId: number) {
-    await this.db.update(listItems).set({
+    await this.db.update(hhListItems).set({
       status: 'pending',
       completedBy: null,
       completedAt: null,
-    }).where(eq(listItems.id, itemId)).run();
+    }).where(eq(hhListItems.id, itemId)).run();
 
-    return this.db.select().from(listItems).where(eq(listItems.id, itemId)).get();
+    return this.db.select().from(hhListItems).where(eq(hhListItems.id, itemId)).get();
   }
 
   async assignItem(itemId: number, dto: AssignListItemDto) {
-    await this.db.update(listItems).set({
+    await this.db.update(hhListItems).set({
       assigneeId: dto.assigneeId,
-    }).where(eq(listItems.id, itemId)).run();
+    }).where(eq(hhListItems.id, itemId)).run();
 
-    return this.db.select().from(listItems).where(eq(listItems.id, itemId)).get();
+    return this.db.select().from(hhListItems).where(eq(hhListItems.id, itemId)).get();
   }
 
   // === 评论 ===
   async addComment(itemId: number, userId: number, dto: AddCommentDto) {
-    return this.db.insert(listItemComments).values({
+    return this.db.insert(hhListItemComments).values({
       listItemId: itemId,
       userId,
       content: dto.content,
@@ -207,22 +207,22 @@ export class ListsService {
   }
 
   async getComments(itemId: number) {
-    return this.db.select().from(listItemComments)
-      .where(eq(listItemComments.listItemId, itemId))
-      .orderBy(listItemComments.createdAt)
+    return this.db.select().from(hhListItemComments)
+      .where(eq(hhListItemComments.listItemId, itemId))
+      .orderBy(hhListItemComments.createdAt)
       .all();
   }
 
   // === 节日模板 ===
   async listHolidayTemplates() {
-    return this.db.select().from(holidayTemplates)
-      .where(eq(holidayTemplates.isPreset, true))
+    return this.db.select().from(hhHolidayTemplates)
+      .where(eq(hhHolidayTemplates.isPreset, true))
       .all();
   }
 
   async createFromTemplate(familyId: number, userId: number, templateId: number) {
-    const template = await this.db.select().from(holidayTemplates)
-      .where(eq(holidayTemplates.id, templateId))
+    const template = await this.db.select().from(hhHolidayTemplates)
+      .where(eq(hhHolidayTemplates.id, templateId))
       .get();
     if (!template) throw new NotFoundException('模板不存在');
 
@@ -233,8 +233,8 @@ export class ListsService {
     });
 
     // 从模板创建条目
-    if (template.items) {
-      for (const item of template.items as any[]) {
+    if (template.invItems) {
+      for (const item of template.invItems as any[]) {
         await this.addItem(list.id, familyId, {
           content: item.name,
           quantity: item.quantity,
@@ -250,11 +250,11 @@ export class ListsService {
   // === 自动补货 ===
   async autoReplenish(familyId: number) {
     // 查询低于阈值的物品
-    const lowStockItems = await this.db.select().from(items)
+    const lowStockItems = await this.db.select().from(invItems)
       .where(and(
-        eq(items.familyId, familyId),
-        sql`${items.minStock} > 0`,
-        sql`${items.quantity} <= ${items.minStock}`,
+        eq(invItems.familyId, familyId),
+        sql`${invItems.minStock} > 0`,
+        sql`${invItems.quantity} <= ${invItems.minStock}`,
       ))
       .all();
 
@@ -263,10 +263,10 @@ export class ListsService {
     }
 
     // 查找或创建购物清单
-    let shoppingList = await this.db.select().from(lists)
+    let shoppingList = await this.db.select().from(hhLists)
       .where(and(
-        eq(lists.familyId, familyId),
-        eq(lists.type, 'shopping'),
+        eq(hhLists.familyId, familyId),
+        eq(hhLists.type, 'shopping'),
       ))
       .get();
 
@@ -280,11 +280,11 @@ export class ListsService {
     let addedCount = 0;
     for (const item of lowStockItems) {
       // 检查是否已在清单中
-      const existing = await this.db.select().from(listItems)
+      const existing = await this.db.select().from(hhListItems)
         .where(and(
-          eq(listItems.listId, shoppingList.id),
-          eq(listItems.linkedItemId, item.id),
-          eq(listItems.status, 'pending'),
+          eq(hhListItems.listId, shoppingList.id),
+          eq(hhListItems.linkedItemId, item.id),
+          eq(hhListItems.status, 'pending'),
         ))
         .get();
 
@@ -313,22 +313,22 @@ export class ListsService {
   // ═══════════════════════════════════════
 
   async getPendingTodos(familyId: number) {
-    const todoLists = await this.db.select().from(lists)
-      .where(and(eq(lists.familyId, familyId), eq(lists.type, 'todo')))
+    const todoLists = await this.db.select().from(hhLists)
+      .where(and(eq(hhLists.familyId, familyId), eq(hhLists.type, 'todo')))
       .all();
 
     if (todoLists.length === 0) return { today: [], overdue: [], upcoming: [], total: 0 };
 
     const listIds = todoLists.map((l: any) => l.id);
     const pendingItems = await this.db.select({
-      item: listItems,
-      listName: lists.name,
-    }).from(listItems)
-      .innerJoin(lists, eq(listItems.listId, lists.id))
+      item: hhListItems,
+      listName: hhLists.name,
+    }).from(hhListItems)
+      .innerJoin(hhLists, eq(hhListItems.listId, hhLists.id))
       .where(
         and(
-          eq(listItems.status, 'pending'),
-          sql`${listItems.listId} IN ${listIds}`,
+          eq(hhListItems.status, 'pending'),
+          sql`${hhListItems.listId} IN ${listIds}`,
         )
       )
       .all();

@@ -1,14 +1,14 @@
 import { Injectable, Inject, NotFoundException } from '@nestjs/common';
 import { DATABASE_TOKEN } from '../../db/database.module';
 import { eq, and, sql } from 'drizzle-orm';
-import { mealPlans, mealPlanItems, recipes, items, lists, listItems } from '../../db/schema';
+import { hhMealPlans, hhMealPlanItems, hhRecipes, invItems, hhLists, hhListItems } from '../../db/schema';
 
 export interface MealPlanResponse {
   id: number;
   familyId: number;
   weekStart: Date;
   weekEnd: Date;
-  items: (MealPlanItemResponse)[];
+  invItems: (MealPlanItemResponse)[];
   createdAt: Date;
 }
 
@@ -29,17 +29,17 @@ export class MealPlansService {
   ) {}
 
   async list(familyId: number): Promise<MealPlanResponse[]> {
-    const plans = await this.db.select().from(mealPlans)
-      .where(eq(mealPlans.familyId, familyId))
-      .orderBy(sql`${mealPlans.weekStart} DESC`)
+    const plans = await this.db.select().from(hhMealPlans)
+      .where(eq(hhMealPlans.familyId, familyId))
+      .orderBy(sql`${hhMealPlans.weekStart} DESC`)
       .all();
 
     return Promise.all(plans.map((plan: any) => this.loadItems(plan)));
   }
 
   async getById(planId: number, familyId: number): Promise<MealPlanResponse> {
-    const plan = await this.db.select().from(mealPlans)
-      .where(and(eq(mealPlans.id, planId), eq(mealPlans.familyId, familyId)))
+    const plan = await this.db.select().from(hhMealPlans)
+      .where(and(eq(hhMealPlans.id, planId), eq(hhMealPlans.familyId, familyId)))
       .get();
     if (!plan) throw new NotFoundException('餐饮计划不存在');
 
@@ -47,14 +47,14 @@ export class MealPlansService {
   }
 
   async create(familyId: number, userId: number | undefined, dto: { weekStart: number; weekEnd: number }): Promise<MealPlanResponse> {
-    const result = await this.db.insert(mealPlans).values({
+    const result = await this.db.insert(hhMealPlans).values({
       familyId,
       weekStart: new Date(dto.weekStart),
       weekEnd: new Date(dto.weekEnd),
       createdBy: userId ?? null,
     }).returning().get();
 
-    return { ...result, items: [] };
+    return { ...result, invItems: [] };
   }
 
   async addItem(planId: number, familyId: number, dto: {
@@ -64,31 +64,31 @@ export class MealPlansService {
     note?: string;
   }): Promise<MealPlanResponse> {
     // Verify plan exists and belongs to family
-    const plan = await this.db.select().from(mealPlans)
-      .where(and(eq(mealPlans.id, planId), eq(mealPlans.familyId, familyId)))
+    const plan = await this.db.select().from(hhMealPlans)
+      .where(and(eq(hhMealPlans.id, planId), eq(hhMealPlans.familyId, familyId)))
       .get();
     if (!plan) throw new NotFoundException('餐饮计划不存在');
 
     // Check for duplicate (same day + mealType + recipe)
-    const existing = await this.db.select().from(mealPlanItems)
+    const existing = await this.db.select().from(hhMealPlanItems)
       .where(and(
-        eq(mealPlanItems.planId, planId),
-        eq(mealPlanItems.dayOfWeek, dto.dayOfWeek),
-        eq(mealPlanItems.mealType, dto.mealType as any),
-        eq(mealPlanItems.recipeId, dto.recipeId),
+        eq(hhMealPlanItems.planId, planId),
+        eq(hhMealPlanItems.dayOfWeek, dto.dayOfWeek),
+        eq(hhMealPlanItems.mealType, dto.mealType as any),
+        eq(hhMealPlanItems.recipeId, dto.recipeId),
       ))
       .get();
 
     if (existing) {
       // Update note if provided
       if (dto.note !== undefined) {
-        await this.db.update(mealPlanItems)
+        await this.db.update(hhMealPlanItems)
           .set({ note: dto.note })
-          .where(eq(mealPlanItems.id, existing.id))
+          .where(eq(hhMealPlanItems.id, existing.id))
           .run();
       }
     } else {
-      await this.db.insert(mealPlanItems).values({
+      await this.db.insert(hhMealPlanItems).values({
         planId,
         dayOfWeek: dto.dayOfWeek,
         mealType: dto.mealType as any,
@@ -106,13 +106,13 @@ export class MealPlansService {
     dayOfWeek?: number;
     note?: string;
   }): Promise<MealPlanResponse> {
-    const plan = await this.db.select().from(mealPlans)
-      .where(and(eq(mealPlans.id, planId), eq(mealPlans.familyId, familyId)))
+    const plan = await this.db.select().from(hhMealPlans)
+      .where(and(eq(hhMealPlans.id, planId), eq(hhMealPlans.familyId, familyId)))
       .get();
     if (!plan) throw new NotFoundException('餐饮计划不存在');
 
-    const item = await this.db.select().from(mealPlanItems)
-      .where(and(eq(mealPlanItems.id, itemId), eq(mealPlanItems.planId, planId)))
+    const item = await this.db.select().from(hhMealPlanItems)
+      .where(and(eq(hhMealPlanItems.id, itemId), eq(hhMealPlanItems.planId, planId)))
       .get();
     if (!item) throw new NotFoundException('餐次不存在');
 
@@ -122,44 +122,44 @@ export class MealPlansService {
     if (dto.dayOfWeek !== undefined) updates.dayOfWeek = dto.dayOfWeek;
     if (dto.note !== undefined) updates.note = dto.note;
 
-    await this.db.update(mealPlanItems)
+    await this.db.update(hhMealPlanItems)
       .set(updates)
-      .where(eq(mealPlanItems.id, itemId))
+      .where(eq(hhMealPlanItems.id, itemId))
       .run();
 
     return this.loadItems(plan);
   }
 
   async removeItem(planId: number, familyId: number, itemId: number): Promise<MealPlanResponse> {
-    const plan = await this.db.select().from(mealPlans)
-      .where(and(eq(mealPlans.id, planId), eq(mealPlans.familyId, familyId)))
+    const plan = await this.db.select().from(hhMealPlans)
+      .where(and(eq(hhMealPlans.id, planId), eq(hhMealPlans.familyId, familyId)))
       .get();
     if (!plan) throw new NotFoundException('餐饮计划不存在');
 
-    await this.db.delete(mealPlanItems)
-      .where(and(eq(mealPlanItems.id, itemId), eq(mealPlanItems.planId, planId)))
+    await this.db.delete(hhMealPlanItems)
+      .where(and(eq(hhMealPlanItems.id, itemId), eq(hhMealPlanItems.planId, planId)))
       .run();
 
     return this.loadItems(plan);
   }
 
   async generateShoppingList(planId: number, familyId: number) {
-    const plan = await this.db.select().from(mealPlans)
-      .where(and(eq(mealPlans.id, planId), eq(mealPlans.familyId, familyId)))
+    const plan = await this.db.select().from(hhMealPlans)
+      .where(and(eq(hhMealPlans.id, planId), eq(hhMealPlans.familyId, familyId)))
       .get();
     if (!plan) throw new NotFoundException('餐饮计划不存在');
 
-    // Collect all items with recipe details
-    const planItems = await this.db.select().from(mealPlanItems)
-      .where(eq(mealPlanItems.planId, planId))
+    // Collect all invItems with recipe details
+    const planItems = await this.db.select().from(hhMealPlanItems)
+      .where(eq(hhMealPlanItems.planId, planId))
       .all();
 
     // Aggregate ingredients across all meals
     const ingredients: Map<string, { name: string; quantity: number; unit: string }> = new Map();
 
     for (const item of planItems) {
-      const recipe = await this.db.select().from(recipes)
-        .where(eq(recipes.id, item.recipeId))
+      const recipe = await this.db.select().from(hhRecipes)
+        .where(eq(hhRecipes.id, item.recipeId))
         .get();
 
       if (recipe?.ingredients) {
@@ -181,22 +181,22 @@ export class MealPlansService {
     }
 
     // Check stock
-    const stockItems = await this.db.select().from(items)
-      .where(eq(items.familyId, familyId))
+    const stockItems = await this.db.select().from(invItems)
+      .where(eq(invItems.familyId, familyId))
       .all();
 
     const stockMap = new Map(stockItems.map((i: any) => [i.name.toLowerCase(), i]));
 
     // Find or create shopping list
-    let shoppingList = await this.db.select().from(lists)
+    let shoppingList = await this.db.select().from(hhLists)
       .where(and(
-        eq(lists.familyId, familyId),
-        eq(lists.type, 'shopping' as any),
+        eq(hhLists.familyId, familyId),
+        eq(hhLists.type, 'shopping' as any),
       ))
       .get();
 
     if (!shoppingList) {
-      shoppingList = await this.db.insert(lists).values({
+      shoppingList = await this.db.insert(hhLists).values({
         familyId,
         name: '餐饮计划采购清单',
         type: 'shopping' as any,
@@ -213,16 +213,16 @@ export class MealPlansService {
 
       if (needed > 0) {
         // Check if already in list
-        const existingItem = await this.db.select().from(listItems)
+        const existingItem = await this.db.select().from(hhListItems)
           .where(and(
-            eq(listItems.listId, shoppingList.id),
-            eq(listItems.content, ing.name),
-            eq(listItems.status, 'pending' as any),
+            eq(hhListItems.listId, shoppingList.id),
+            eq(hhListItems.content, ing.name),
+            eq(hhListItems.status, 'pending' as any),
           ))
           .get();
 
         if (!existingItem) {
-          await this.db.insert(listItems).values({
+          await this.db.insert(hhListItems).values({
             listId: shoppingList.id,
             content: ing.name,
             quantity: needed,
@@ -244,28 +244,28 @@ export class MealPlansService {
   }
 
   async delete(planId: number, familyId: number) {
-    const plan = await this.db.select().from(mealPlans)
-      .where(and(eq(mealPlans.id, planId), eq(mealPlans.familyId, familyId)))
+    const plan = await this.db.select().from(hhMealPlans)
+      .where(and(eq(hhMealPlans.id, planId), eq(hhMealPlans.familyId, familyId)))
       .get();
     if (!plan) throw new NotFoundException('餐饮计划不存在');
 
     // Items are cascade-deleted by FK
-    await this.db.delete(mealPlans)
-      .where(eq(mealPlans.id, planId))
+    await this.db.delete(hhMealPlans)
+      .where(eq(hhMealPlans.id, planId))
       .run();
     return { success: true };
   }
 
   private async loadItems(plan: any): Promise<MealPlanResponse> {
-    const items = await this.db.select().from(mealPlanItems)
-      .where(eq(mealPlanItems.planId, plan.id))
+    const invItems = await this.db.select().from(hhMealPlanItems)
+      .where(eq(hhMealPlanItems.planId, plan.id))
       .all();
 
     // Hydrate recipe details
     const withRecipes = await Promise.all(
-      items.map(async (item: any) => {
-        const recipe = await this.db.select().from(recipes)
-          .where(eq(recipes.id, item.recipeId))
+      invItems.map(async (item: any) => {
+        const recipe = await this.db.select().from(hhRecipes)
+          .where(eq(hhRecipes.id, item.recipeId))
           .get();
         return { ...item, recipe: recipe || null };
       })
@@ -273,7 +273,7 @@ export class MealPlansService {
 
     return {
       ...plan,
-      items: withRecipes,
+      invItems: withRecipes,
     };
   }
 }

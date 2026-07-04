@@ -1,7 +1,7 @@
 import { Injectable, Inject } from '@nestjs/common';
 import { eq, and } from 'drizzle-orm';
 import { DATABASE_TOKEN } from '../../db/database.module';
-import { pluginData } from '../../db/schema';
+import { sysPluginData } from '../../db/schema';
 import { PluginStorage } from '../types/plugin.types';
 
 /**
@@ -30,9 +30,9 @@ export class PluginStorageService {
    * @returns The stored value (auto-deserialized from JSON), or null if not found
    */
   async get(pluginId: string, key: string): Promise<any> {
-    const rows = await this.db.select({ value: pluginData.value })
-      .from(pluginData)
-      .where(and(eq(pluginData.pluginId, pluginId), eq(pluginData.key, key)));
+    const rows = await this.db.select({ value: sysPluginData.value })
+      .from(sysPluginData)
+      .where(and(eq(sysPluginData.pluginId, pluginId), eq(sysPluginData.key, key)));
     return rows.length > 0 ? rows[0].value : null;
   }
 
@@ -44,10 +44,10 @@ export class PluginStorageService {
    * @param value - The value to store (auto-serialized to JSON)
    */
   async set(pluginId: string, key: string, value: any): Promise<void> {
-    await this.db.insert(pluginData)
+    await this.db.insert(sysPluginData)
       .values({ pluginId, key, value })
       .onConflictDoUpdate({
-        target: [pluginData.pluginId, pluginData.key],
+        target: [sysPluginData.pluginId, sysPluginData.key],
         set: { value, updatedAt: new Date() },
       })
       .run();
@@ -60,8 +60,8 @@ export class PluginStorageService {
    * @param key - The storage key to delete
    */
   async delete(pluginId: string, key: string): Promise<void> {
-    await this.db.delete(pluginData)
-      .where(and(eq(pluginData.pluginId, pluginId), eq(pluginData.key, key)))
+    await this.db.delete(sysPluginData)
+      .where(and(eq(sysPluginData.pluginId, pluginId), eq(sysPluginData.key, key)))
       .run();
   }
 
@@ -71,8 +71,8 @@ export class PluginStorageService {
    * @param pluginId - The plugin identifier
    */
   async clear(pluginId: string): Promise<void> {
-    await this.db.delete(pluginData)
-      .where(eq(pluginData.pluginId, pluginId))
+    await this.db.delete(sysPluginData)
+      .where(eq(sysPluginData.pluginId, pluginId))
       .run();
   }
 
@@ -83,9 +83,9 @@ export class PluginStorageService {
    * @returns Array of key strings
    */
   async listKeys(pluginId: string): Promise<string[]> {
-    const rows = await this.db.select({ key: pluginData.key })
-      .from(pluginData)
-      .where(eq(pluginData.pluginId, pluginId));
+    const rows = await this.db.select({ key: sysPluginData.key })
+      .from(sysPluginData)
+      .where(eq(sysPluginData.pluginId, pluginId));
     return rows.map((r: { key: string }) => r.key);
   }
 
@@ -113,38 +113,38 @@ class ScopedPluginStorage implements PluginStorage {
   ) {}
 
   async get(key: string): Promise<any> {
-    const rows = await this.db.select({ value: pluginData.value })
-      .from(pluginData)
-      .where(and(eq(pluginData.pluginId, this.pluginId), eq(pluginData.key, key)));
+    const rows = await this.db.select({ value: sysPluginData.value })
+      .from(sysPluginData)
+      .where(and(eq(sysPluginData.pluginId, this.pluginId), eq(sysPluginData.key, key)));
     return rows.length > 0 ? rows[0].value : null;
   }
 
   async set(key: string, value: any): Promise<void> {
-    await this.db.insert(pluginData)
+    await this.db.insert(sysPluginData)
       .values({ pluginId: this.pluginId, key, value })
       .onConflictDoUpdate({
-        target: [pluginData.pluginId, pluginData.key],
+        target: [sysPluginData.pluginId, sysPluginData.key],
         set: { value, updatedAt: new Date() },
       })
       .run();
   }
 
   async delete(key: string): Promise<void> {
-    await this.db.delete(pluginData)
-      .where(and(eq(pluginData.pluginId, this.pluginId), eq(pluginData.key, key)))
+    await this.db.delete(sysPluginData)
+      .where(and(eq(sysPluginData.pluginId, this.pluginId), eq(sysPluginData.key, key)))
       .run();
   }
 
   async clear(): Promise<void> {
-    await this.db.delete(pluginData)
-      .where(eq(pluginData.pluginId, this.pluginId))
+    await this.db.delete(sysPluginData)
+      .where(eq(sysPluginData.pluginId, this.pluginId))
       .run();
   }
 
   async listKeys(): Promise<string[]> {
-    const rows = await this.db.select({ key: pluginData.key })
-      .from(pluginData)
-      .where(eq(pluginData.pluginId, this.pluginId));
+    const rows = await this.db.select({ key: sysPluginData.key })
+      .from(sysPluginData)
+      .where(eq(sysPluginData.pluginId, this.pluginId));
     return rows.map((r: { key: string }) => r.key);
   }
 }
