@@ -134,7 +134,7 @@ export async function migrateFromGrocy(options: MigrationOptions): Promise<Migra
     const productToItemMap = new Map<number, number>();
     for (let i = 0; i < grocyProducts.length; i++) { if (insertedItems[i]) productToItemMap.set(grocyProducts[i].id, insertedItems[i].id); }
 
-    if (grocyStockLog.length > 0) { const m = mapStockLog(grocyStockLog, productToItemMap, options.familyId, defaultUserId, unitMap); report.warnings.push(...m.warnings); if (m.items.length > 0) { await db.insert(schema.invStockTransactions).values(m.items); report.summary.stockTransactions = m.items.length; console.log(`  ✓ 流水: ${m.items.length}`); } }
+    if (grocyStockLog.length > 0) { const m = mapStockLog(grocyStockLog, productToItemMap, options.familyId, defaultUserId, unitMap, shopMap); report.warnings.push(...m.warnings); if (m.items.length > 0) { await db.insert(schema.invStockTransactions).values(m.items); report.summary.stockTransactions = m.items.length; console.log(`  ✓ 流水: ${m.items.length}`); } }
 
     if (grocyShoppingListItems.length > 0) {
       const { list, items: listItems, warnings } = mapShoppingList(grocyShoppingListItems, productGrocyNameMap, options.familyId, defaultUserId, unitMap);

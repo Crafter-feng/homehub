@@ -19,7 +19,7 @@ export interface HhShopInsert { familyId: number; name: string; icon: string | n
 export interface HhProductInsert { familyId: number; name: string; barcode: string | null; categoryId: number | null; unit: string; brand: string | null; defaultPrice: number | null; notes: string | null; createdAt: Date; updatedAt: Date; }
 export interface HhItemInsert { familyId: number; productId: number | null; name: string; type: string; barcode: string | null; categoryId: number | null; locationId: number | null; quantity: number; unit: string; minStock: number; brand: string | null; shop: string | null; notes: string | null; expiryDate: Date | null; purchaseDate: Date | null; purchasePrice: number | null; createdAt: Date; updatedAt: Date; }
 export interface HhBatchInsert { itemId: number; batchNumber: string | null; quantity: number; unit: string; purchaseDate: Date | null; expiryDate: Date | null; locationId: number | null; createdAt: Date; }
-export interface HhStockTxInsert { itemId: number; batchId: number | null; type: 'add' | 'consume' | 'transfer' | 'adjust'; quantity: number; unit: string; fromLocationId: number | null; toLocationId: number | null; userId: number; source: 'manual' | 'barcode' | 'nfc' | 'rfid' | 'voice' | 'vision' | 'mcp'; note: string | null; createdAt: Date; }
+export interface HhStockTxInsert { itemId: number; batchId: number | null; type: 'add' | 'consume' | 'transfer' | 'adjust'; quantity: number; unit: string; fromLocationId: number | null; toLocationId: number | null; userId: number; source: 'manual' | 'barcode' | 'nfc' | 'rfid' | 'voice' | 'vision' | 'mcp'; note: string | null; price: number | null; shop: string | null; spec: string | null; createdAt: Date; }
 export interface HhListInsert { familyId: number; name: string; type: 'shopping' | 'todo' | 'chore' | 'holiday' | 'meal_plan'; notes: string | null; config: Record<string, unknown> | null; createdBy: number | null; createdAt: Date; updatedAt: Date; }
 export interface HhListItemInsert { listId: number; content: string; notes: string | null; status: 'pending' | 'completed' | 'cancelled'; completedBy: number | null; completedAt: Date | null; assigneeId: number | null; quantity: number | null; unit: string | null; linkedItemId: number | null; dueAt: Date | null; lastResetAt: Date | null; sortOrder: number; createdAt: Date; }
 export interface HhRecipeInsert { familyId: number; name: string; description: string | null; notes: string | null; ingredients: Array<{ itemName: string; quantity: number; unit: string; optional?: boolean }>; steps: Array<{ stepNumber: number; instruction: string; duration?: string }>; prepTime: number | null; cookTime: number | null; servings: number | null; image: string | null; source: string | null; createdAt: Date; }
@@ -93,13 +93,14 @@ export function mapProductsAndStock(products: GrocyProduct[], stockEntries: Groc
   return { products: productItems, items: invItems, batches, warnings };
 }
 
-export function mapStockLog(stockLogs: GrocyStockLog[], productToItemMap: Map<number, number>, familyId: number, defaultUserId: number, unitMap?: Map<number, string>): MapResult<HhStockTxInsert> {
+export function mapStockLog(stockLogs: GrocyStockLog[], productToItemMap: Map<number, number>, familyId: number, defaultUserId: number, unitMap?: Map<number, string>, shopMap?: Map<number, string>, locationMap?: Map<number, number>): MapResult<HhStockTxInsert> {
   const warnings: string[] = [];
   const items: HhStockTxInsert[] = [];
   for (const log of stockLogs) {
     const itemId = productToItemMap.get(log.product_id);
     if (itemId === undefined) { warnings.push(`stock_log product_id=${log.product_id} 未找到对应 item，已跳过`); continue; }
-    items.push({ itemId, batchId: null, type: mapStockTxType(log.transaction_type), quantity: Math.abs(log.amount), unit: unitMap?.get(log.product_id) || '个', fromLocationId: null, toLocationId: null, userId: log.user_id || defaultUserId, source: 'manual', note: log.note || log.transaction_type, createdAt: parseGrocyTimestamp(log.row_created_timestamp) });
+    const shopName = log.location_id && shopMap ? shopMap.get(log.location_id) || null : null;
+    items.push({ itemId, batchId: null, type: mapStockTxType(log.transaction_type), quantity: Math.abs(log.amount), unit: unitMap?.get(log.product_id) || '个', fromLocationId: null, toLocationId: locationMap?.get(log.location_id) || null, userId: log.user_id || defaultUserId, source: 'manual', note: log.note || log.transaction_type, price: log.price || null, shop: shopName, spec: null, createdAt: parseGrocyTimestamp(log.row_created_timestamp) });
   }
   return { items, warnings };
 }
