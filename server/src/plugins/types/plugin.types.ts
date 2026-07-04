@@ -37,7 +37,7 @@ export interface HomeHubPlugin {
   onLoad?(ctx: PluginContext): Promise<void>;
   onUnload?(ctx: PluginContext): Promise<void>;
   onConfigChange?(config: Record<string, any>): Promise<void>;
-  exports?: Record<string, any>;
+  exports?: Record<string, any>; // Duck-typed: runtime checks determine specific type
 }
 
 // === 插件上下文 (DI-injected, no mocks) ===
