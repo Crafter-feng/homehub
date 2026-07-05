@@ -246,7 +246,7 @@ async function save() {
   saving.value = true;
   try {
     if (isEdit.value && props.item) {
-      // 编辑：调用 PUT /stock/items/:id
+      // 编辑：调用 PUT /stock/products/:id
       await stockApi.update(props.item.id, {
         name: form.name,
         categoryId: form.categoryId || undefined,
@@ -264,7 +264,7 @@ async function save() {
       });
       message.success(t('stock.addSuccess').replace('添加', '更新'));
     } else {
-      // 创建：调用 POST /stock/items
+      // 创建：调用 POST /stock/products
       await stockApi.create({
         name: form.name,
         type: 'generic',

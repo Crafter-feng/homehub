@@ -3476,8 +3476,8 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
-    "sys_scan_logs": {
-      "name": "sys_scan_logs",
+    "sys_tigger_logs": {
+      "name": "sys_tigger_logs",
       "columns": {
         "id": {
           "name": "id",
@@ -3538,9 +3538,9 @@
       },
       "indexes": {},
       "foreignKeys": {
-        "sys_scan_logs_family_id_families_id_fk": {
-          "name": "sys_scan_logs_family_id_families_id_fk",
-          "tableFrom": "sys_scan_logs",
+        "sys_tigger_logs_family_id_families_id_fk": {
+          "name": "sys_tigger_logs_family_id_families_id_fk",
+          "tableFrom": "sys_tigger_logs",
           "tableTo": "families",
           "columnsFrom": [
             "family_id"

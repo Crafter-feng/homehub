@@ -144,35 +144,34 @@ export const productsApi = {
 // === Stock API ===
 export const stockApi = {
   list: (params?: PaginationQuery & { category?: string; location?: string; expiring?: number }) =>
-    api.get('/stock/items', { params }),
-  getById: (id: number) => api.get(`/stock/items/${id}`),
-  search: (query: string) => api.get('/stock/items/search', { params: { q: query } }),
-  create: (data: Partial<Item>) => api.post('/stock/items', data),
-  update: (id: number, data: Partial<Item>) => api.put(`/stock/items/${id}`, data),
-  delete: (id: number) => api.delete(`/stock/items/${id}`),
+    api.get('/stock/products', { params }),
+  getById: (id: number) => api.get(`/stock/products/${id}`),
+  search: (query: string) => api.get(`/stock/products/search`, { params: { q: query } }),
+  create: (data: Partial<Item>) => api.post('/stock/products', data),
+  update: (id: number, data: Partial<Item>) => api.put(`/stock/products/${id}`, data),
+  delete: (id: number) => api.delete(`/stock/products/${id}`),
   consume: (id: number, data: { quantity: number; note?: string; batchId?: number; spoiled?: number }) =>
-    api.post(`/stock/items/${id}/consume`, data),
+    api.post(`/stock/products/${id}/consume`, data),
   stockIn: (id: number, data: { quantity: number; note?: string; price?: number; shop?: string; batchNumber?: string; expiryDate?: number; purchaseDate?: number; locationId?: number }) =>
-    api.post(`/stock/items/${id}/stock-in`, data),
+    api.post(`/stock/products/${id}/stock-in`, data),
   transfer: (id: number, data: { toLocationId: number; quantity?: number }) =>
-    api.post(`/stock/items/${id}/transfer`, data),
+    api.post(`/stock/products/${id}/transfer`, data),
   adjust: (id: number, data: { quantity: number; note?: string }) =>
-    api.post(`/stock/items/${id}/adjust`, data),
-  getHistory: (id: number) => api.get(`/stock/items/${id}/history`),
-  getPriceHistory: (id: number) => api.get(`/stock/items/${id}/price-history`),
-  getQRCodeUrl: (id: number) => `/api/v1/stock/items/${id}/qrcode`,
-  getExpiring: (days?: number) => api.get('/stock/expiring', { params: { days } }),
+    api.post(`/stock/products/${id}/adjust`, data),
+  open: (id: number) => api.post(`/stock/products/${id}/open`),
+  getHistory: (id: number) => api.get(`/stock/products/${id}/batches`),
+  getPriceHistory: (id: number) => api.get(`/stock/products/${id}/price-history`),
+  getQRCodeUrl: (id: number) => `/api/v1/stock/products/${id}/qrcode`,
   getSummary: () => api.get('/stock/summary'),
   // Batch API
-  listBatches: (itemId: number) => api.get(`/stock/items/${itemId}/batches`),
-  getBatchSummary: (itemId: number) => api.get(`/stock/items/${itemId}/batches/summary`),
+  listBatches: (productId: number) => api.get(`/stock/products/${productId}/batches`),
+  getBatchSummary: (productId: number) => api.get(`/stock/products/${productId}/batches/summary`),
   updateBatch: (batchId: number, data: { batchNumber?: string; quantity?: number; expiryDate?: number; purchaseDate?: number; locationId?: number }) =>
-    api.put(`/stock/items/batches/${batchId}`, data),
-  deleteBatch: (batchId: number) => api.delete(`/stock/items/batches/${batchId}`),
-  compactBatches: (itemId: number) => api.post(`/stock/items/${itemId}/batches/compact`),
-  // CSV
-  exportCsv: () => api.get('/stock/export', { responseType: 'blob' }),
-  importCsv: (data: { invItems: Array<Partial<Item>> }) => api.post('/stock/import', data),
+    api.put(`/stock/products/batches/${batchId}`, data),
+  deleteBatch: (batchId: number) => api.delete(`/stock/products/batches/${batchId}`),
+  merge: (keepId: number, removeId: number) => api.post(`/stock/products/${keepId}/merge/${removeId}`),
+  // Categories
+  listCategories: () => api.get('/categories'),
 };
 
 // === Locations API ===
