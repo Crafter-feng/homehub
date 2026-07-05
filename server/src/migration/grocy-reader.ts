@@ -107,6 +107,7 @@ export interface GrocyStockLog {
   price: number;
   undone: number;
   location_id: number;
+  shopping_location_id: number;
   recipe_id: number;
   user_id: number;
   note: string;
@@ -241,7 +242,7 @@ export class GrocyReader {
 
   getStockLog(): GrocyStockLog[] {
     if (!this.hasTable('stock_log')) return [];
-    return this.db.prepare(`SELECT id, product_id, amount, best_before_date, purchased_date, used_date, spoiled, stock_id, transaction_type, price, undone, location_id, recipe_id, user_id, note, row_created_timestamp FROM stock_log WHERE undone = 0`).all() as GrocyStockLog[];
+    return this.db.prepare(`SELECT id, product_id, amount, best_before_date, purchased_date, used_date, spoiled, stock_id, transaction_type, price, undone, location_id, shopping_location_id, recipe_id, user_id, note, row_created_timestamp FROM stock_log WHERE undone = 0`).all() as GrocyStockLog[];
   }
 
   getShoppingListItems(): GrocyShoppingList[] {

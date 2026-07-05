@@ -117,47 +117,34 @@ function seed() {
 
     // Create product
     const prodResult = db.prepare(`
-      INSERT INTO inv_products (family_id, name, category_id, unit, default_best_before_days, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(FAMILY_ID, template.name, categoryId, template.unit, template.bestBeforeDays, Date.now(), Date.now());
+      INSERT INTO inv_products (family_id, name, category_id, unit, location_id, min_stock, default_best_before_days, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(FAMILY_ID, template.name, categoryId, template.unit, locationId, template.minStock, template.bestBeforeDays, Date.now(), Date.now());
     const productId = Number(prodResult.lastInsertRowid);
     totalProducts++;
 
-    // Create item
-    const quantity = randomInt(1, 10);
-    const itemResult = db.prepare(`
-      INSERT INTO inv_items (family_id, product_id, name, type, category_id, location_id, quantity, unit, min_stock, purchase_price, expiry_date, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      FAMILY_ID, productId, template.name, template.category,
-      categoryId, locationId, quantity, template.unit, template.minStock,
-      randomFloat(5, 50),
-      Date.now() + randomInt(-10, 30) * 86400000, // Random expiry
-      Date.now(), Date.now()
-    );
-    const itemId = Number(itemResult.lastInsertRowid);
-
     // Create batch
-    const batchResult = db.prepare(`
-      INSERT INTO inv_item_batches (item_id, quantity, unit, purchase_date, expiry_date, location_id, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+    const quantity = randomInt(1, 10);
+    db.prepare(`
+      INSERT INTO inv_batches (product_id, quantity, unit, purchase_date, expiry_date, location_id, price, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
-      itemId, quantity, template.unit,
+      productId, quantity, template.unit,
       Date.now() - randomInt(1, 14) * 86400000,
       Date.now() + randomInt(-10, 30) * 86400000,
-      locationId, Date.now()
+      locationId, randomFloat(5, 50), Date.now()
     );
     totalBatches++;
 
     // Create some transactions
     const txCount = randomInt(1, 3);
     for (let i = 0; i < txCount; i++) {
-      const txType = Math.random() > 0.7 ? 'consume' : 'add';
+      const txType: 'purchase' | 'consume' = Math.random() > 0.7 ? 'consume' : 'purchase';
       const txQty = randomFloat(0.5, 3);
       db.prepare(`
-        INSERT INTO inv_stock_transactions (item_id, type, quantity, unit, user_id, source, created_at)
+        INSERT INTO inv_stock_log (product_id, type, quantity, unit, user_id, source, created_at)
         VALUES (?, ?, ?, ?, ?, 'manual', ?)
-      `).run(itemId, txType, txQty, template.unit, USER_ID, Date.now() - randomInt(1, 30) * 86400000);
+      `).run(productId, txType, txQty, template.unit, USER_ID, Date.now() - randomInt(1, 30) * 86400000);
       totalTransactions++;
     }
   }

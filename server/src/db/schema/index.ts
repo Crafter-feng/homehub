@@ -26,7 +26,7 @@ export {
 
 // ── 系统（扫码/触发器/通知/插件/自定义字段/硬件） ──
 export {
-  sysTriggerBindings, sysNfcTagState, sysRfidReaders, sysRfidZones,
+  sysTriggerLogs, sysTriggerBindings, sysNfcTagState, sysRfidReaders, sysRfidZones,
   sysAutomationTriggers, sysEncoderJobs,
   sysNotificationRules, sysNotifications,
   sysPluginData,

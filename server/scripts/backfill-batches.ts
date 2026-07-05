@@ -15,41 +15,36 @@ db.pragma('foreign_keys = ON');
 function backfill() {
   console.log('Starting batch backfill...');
 
-  // Find items with quantity > 0 and no batches
-  const itemsWithoutBatches = db.prepare(`
-    SELECT i.id, i.name, i.quantity, i.unit, i.expiry_date, i.location_id
-    FROM inv_items i
-    LEFT JOIN inv_item_batches b ON b.item_id = i.id
-    WHERE i.quantity > 0
-    GROUP BY i.id
+  // Find products that have no batch records
+  const productsWithoutBatches = db.prepare(`
+    SELECT p.id, p.name, p.unit, p.location_id
+    FROM inv_products p
+    LEFT JOIN inv_batches b ON b.product_id = p.id
+    GROUP BY p.id
     HAVING COUNT(b.id) = 0
   `).all() as Array<{
     id: number;
     name: string;
-    quantity: number;
     unit: string;
-    expiry_date: number | null;
     location_id: number | null;
   }>;
 
-  console.log(`Found ${itemsWithoutBatches.length} items without batches`);
+  console.log(`Found ${productsWithoutBatches.length} products without batches`);
 
   const insertBatch = db.prepare(`
-    INSERT INTO inv_item_batches (item_id, quantity, unit, expiry_date, location_id, created_at)
-    VALUES (?, ?, ?, ?, ?, ?)
+    INSERT INTO inv_batches (product_id, quantity, unit, location_id, created_at)
+    VALUES (?, 0, ?, ?, ?)
   `);
 
   let created = 0;
-  for (const item of itemsWithoutBatches) {
+  for (const product of productsWithoutBatches) {
     insertBatch.run(
-      item.id,
-      item.quantity,
-      item.unit,
-      item.expiry_date,
-      item.location_id,
+      product.id,
+      product.unit,
+      product.location_id,
       Date.now(),
     );
-    console.log(`  Created batch for "${item.name}" (qty: ${item.quantity} ${item.unit})`);
+    console.log(`  Created batch for "${product.name}"`);
     created++;
   }
 

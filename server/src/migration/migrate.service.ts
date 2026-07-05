@@ -82,14 +82,16 @@ export async function migrateFromGrocy(options: MigrationOptions): Promise<Migra
     if (options.dryRun) {
       console.log('\n[DRY RUN] 预检结果\n');
       if (!options.skipUsers && grocyUsers.length > 0) { const m = await mapUsers(grocyUsers); report.summary.users = m.items.length; console.log(`  ○ 用户: ${m.items.length}`); }
+      const dryLocationIdMap = new Map<number, number>(); grocyLocations.forEach((loc, idx) => dryLocationIdMap.set(loc.id, idx + 1));
       if (grocyLocations.length > 0) { const m = mapLocations(grocyLocations, options.familyId); report.summary.locations = m.items.length; console.log(`  ○ 位置: ${m.items.length}`); }
       if (grocyUnits.length > 0) { const m = mapUnits(grocyUnits, options.familyId); report.summary.units = m.items.length; console.log(`  ○ 单位: ${m.items.length}`); }
-      if (grocyProductGroups.length > 0) { const m = mapProductGroups(grocyProductGroups, options.familyId); report.summary.categories = m.items.length; console.log(`  ○ 分类: ${m.items.length}`); }
+      const dryCategoryMap = new Map<number, number>(); const dryCategoryNameMap = new Map<number, string>();
+      if (grocyProductGroups.length > 0) { grocyProductGroups.forEach((g, idx) => { dryCategoryMap.set(g.id, idx + 1); dryCategoryNameMap.set(g.id, g.name); }); const m = mapProductGroups(grocyProductGroups, options.familyId); report.summary.categories = m.items.length; console.log(`  ○ 分类: ${m.items.length}`); }
       if (grocyShops.length > 0) { const m = mapShops(grocyShops, options.familyId); report.summary.shops = m.items.length; console.log(`  ○ 商店: ${m.items.length}`); }
-      const pResult = mapProductsAndStock(grocyProducts, grocyStock, grocyBarcodes, grocyUnits, grocyLocations, options.familyId, shopMap);
+      const pResult = mapProductsAndStock(grocyProducts, grocyStock, grocyBarcodes, grocyUnits, grocyLocations, options.familyId, shopMap, dryCategoryMap, dryCategoryNameMap, dryLocationIdMap);
       report.summary.products = pResult.products.length; report.summary.items = pResult.items.length; report.summary.batches = pResult.batches.length;
       console.log(`  ○ 产品: ${pResult.products.length}, 库存: ${pResult.items.length}, 批次: ${pResult.batches.length}`);
-      if (grocyStockLog.length > 0) { const pToI = new Map<number, number>(); grocyProducts.forEach((p, i) => pToI.set(p.id, i + 1)); const m = mapStockLog(grocyStockLog, pToI, options.familyId, defaultUserId, unitMap); report.summary.stockTransactions = m.items.length; console.log(`  ○ 流水: ${m.items.length}`); }
+      if (grocyStockLog.length > 0) { const pToI = new Map<number, number>(); grocyProducts.forEach((p, i) => pToI.set(p.id, i + 1)); const productUnitMap = new Map<number, string>(); grocyProducts.forEach(p => { const u = grocyUnits.find(u => u.id === p.qu_id_stock); if (u) productUnitMap.set(p.id, u.name); }); const m = mapStockLog(grocyStockLog, pToI, options.familyId, defaultUserId, unitMap, shopMap, dryLocationIdMap, productUnitMap); report.summary.stockTransactions = m.items.length; console.log(`  ○ 流水: ${m.items.length}`); }
       if (grocyShoppingListItems.length > 0) { const r = mapShoppingList(grocyShoppingListItems, productGrocyNameMap, options.familyId, defaultUserId, unitMap); report.summary.shoppingLists = 1; report.summary.shoppingListItems = r.items.length; console.log(`  ○ 购物清单: 1/${r.items.length}`); }
       if (grocyRecipes.length > 0) { const m = mapRecipes(grocyRecipes, grocyRecipePos, productGrocyNameMap, options.familyId, unitMap); report.summary.recipes = m.items.length; console.log(`  ○ 食谱: ${m.items.length}`); }
       if (grocyChores.length > 0) { const r = mapChores(grocyChores, options.familyId, defaultUserId); report.summary.chores = r.lists.length; console.log(`  ○ 家务: ${r.lists.length}`); }
@@ -98,7 +100,17 @@ export async function migrateFromGrocy(options: MigrationOptions): Promise<Migra
 
     // ── 实际迁移 ──
     if (!options.skipUsers && grocyUsers.length > 0) { const m = await mapUsers(grocyUsers); report.warnings.push(...m.warnings); if (m.items.length > 0) { await db.insert(schema.users).values(m.items); report.summary.users = m.items.length; console.log(`  ✓ 用户: ${m.items.length}`); } }
-    if (grocyLocations.length > 0) { const m = mapLocations(grocyLocations, options.familyId); if (m.items.length > 0) { await db.insert(schema.mdLocations).values(m.items); report.summary.locations = m.items.length; console.log(`  ✓ 位置: ${m.items.length}`); } }
+    // 位置：插入后获取实际 ID 映射
+    const locationIdMap = new Map<number, number>(); // grocy_location_id → homehub_location_id
+    if (grocyLocations.length > 0) {
+      const m = mapLocations(grocyLocations, options.familyId);
+      if (m.items.length > 0) {
+        const result = await db.insert(schema.mdLocations).values(m.items).returning();
+        result.forEach((row, idx) => { locationIdMap.set(grocyLocations[idx].id, row.id); });
+        report.summary.locations = m.items.length;
+        console.log(`  ✓ 位置: ${m.items.length}`);
+      }
+    }
     if (grocyUnits.length > 0) { const m = mapUnits(grocyUnits, options.familyId); if (m.items.length > 0) { await db.insert(schema.mdUnits).values(m.items); report.summary.units = m.items.length; console.log(`  ✓ 单位: ${m.items.length}`); } }
 
     // 分类：先插入再建映射
@@ -119,38 +131,55 @@ export async function migrateFromGrocy(options: MigrationOptions): Promise<Migra
 
     if (grocyShops.length > 0) { const m = mapShops(grocyShops, options.familyId); if (m.items.length > 0) { await db.insert(schema.mdShops).values(m.items); report.summary.shops = m.items.length; console.log(`  ✓ 商店: ${m.items.length}`); } }
 
-    const pResult = mapProductsAndStock(grocyProducts, grocyStock, grocyBarcodes, grocyUnits, grocyLocations, options.familyId, shopMap, categoryMap, categoryNameMap);
+    const pResult = mapProductsAndStock(grocyProducts, grocyStock, grocyBarcodes, grocyUnits, grocyLocations, options.familyId, shopMap, categoryMap, categoryNameMap, locationIdMap);
     report.warnings.push(...pResult.warnings);
-    if (pResult.products.length > 0) { await db.insert(schema.invProducts).values(pResult.products); report.summary.products = pResult.products.length; console.log(`  ✓ 产品: ${pResult.products.length}`); }
 
-    const insertedProducts: Array<{ id: number }> = [];
-    if (pResult.products.length > 0) { const r = await db.insert(schema.invProducts).values(pResult.products).returning(); insertedProducts.push(...r); report.summary.products = r.length; console.log(`  ✓ 产品: ${r.length}`); }
+    // 插入产品并获取 ID 映射
+    let insertedProducts: Array<{ id: number }> = [];
+    if (pResult.products.length > 0) {
+      const r = db.insert(schema.invProducts).values(pResult.products).run();
+      // 获取插入的产品 ID
+      const lastId = Number(r.lastInsertRowid);
+      for (let i = 0; i < pResult.products.length; i++) {
+        insertedProducts.push({ id: lastId - pResult.products.length + i + 1 });
+      }
+      report.summary.products = pResult.products.length;
+      console.log(`  ✓ 产品: ${pResult.products.length}`);
+    }
 
     if (pResult.batches.length > 0) {
       const batchesWithRealIds = pResult.batches.map(b => ({ ...b, productId: insertedProducts[b.productId - 1]?.id ?? b.productId }));
-      await db.insert(schema.invBatches).values(batchesWithRealIds); report.summary.batches = batchesWithRealIds.length; console.log(`  ✓ 批次: ${batchesWithRealIds.length}`);
+      db.insert(schema.invBatches).values(batchesWithRealIds).run();
+      report.summary.batches = batchesWithRealIds.length;
+      console.log(`  ✓ 批次: ${batchesWithRealIds.length}`);
     }
 
     const productToIdMap = new Map<number, number>();
     for (let i = 0; i < grocyProducts.length; i++) { if (insertedProducts[i]) productToIdMap.set(grocyProducts[i].id, insertedProducts[i].id); }
 
-    if (grocyStockLog.length > 0) { const m = mapStockLog(grocyStockLog, productToIdMap, options.familyId, defaultUserId, unitMap, shopMap); report.warnings.push(...m.warnings); if (m.items.length > 0) { await db.insert(schema.invStockLog).values(m.items); report.summary.stockTransactions = m.items.length; console.log(`  ✓ 流水: ${m.items.length}`); } }
+    if (grocyStockLog.length > 0) {
+      const productUnitMap = new Map<number, string>();
+      grocyProducts.forEach(p => { const u = grocyUnits.find(u => u.id === p.qu_id_stock); if (u) productUnitMap.set(p.id, u.name); });
+      const m = mapStockLog(grocyStockLog, productToIdMap, options.familyId, defaultUserId, unitMap, shopMap, locationIdMap, productUnitMap);
+      report.warnings.push(...m.warnings);
+      if (m.items.length > 0) { db.insert(schema.invStockLog).values(m.items).run(); report.summary.stockTransactions = m.items.length; console.log(`  ✓ 流水: ${m.items.length}`); }
+    }
 
     if (grocyShoppingListItems.length > 0) {
       const { list, items: listItems, warnings } = mapShoppingList(grocyShoppingListItems, productGrocyNameMap, options.familyId, defaultUserId, unitMap);
       report.warnings.push(...warnings);
-      const listResult = await db.insert(schema.hhLists).values(list).returning();
+      const listResult = db.insert(schema.hhLists).values(list).run();
       report.summary.shoppingLists = 1;
-      if (listItems.length > 0) { const itemsWithId = listItems.map(item => ({ ...item, listId: listResult[0].id })); await db.insert(schema.hhListItems).values(itemsWithId); report.summary.shoppingListItems = itemsWithId.length; }
+      if (listItems.length > 0) { const itemsWithId = listItems.map(item => ({ ...item, listId: Number(listResult.lastInsertRowid) })); db.insert(schema.hhListItems).values(itemsWithId).run(); report.summary.shoppingListItems = itemsWithId.length; }
       console.log(`  ✓ 购物清单: 1/${report.summary.shoppingListItems}`);
     }
 
-    if (grocyRecipes.length > 0) { const m = mapRecipes(grocyRecipes, grocyRecipePos, productGrocyNameMap, options.familyId, unitMap); report.warnings.push(...m.warnings); if (m.items.length > 0) { await db.insert(schema.hhRecipes).values(m.items); report.summary.recipes = m.items.length; console.log(`  ✓ 食谱: ${m.items.length}`); } }
+    if (grocyRecipes.length > 0) { const m = mapRecipes(grocyRecipes, grocyRecipePos, productGrocyNameMap, options.familyId, unitMap); report.warnings.push(...m.warnings); if (m.items.length > 0) { db.insert(schema.hhRecipes).values(m.items).run(); report.summary.recipes = m.items.length; console.log(`  ✓ 食谱: ${m.items.length}`); } }
 
     if (grocyChores.length > 0) {
       const { lists, items: choreItems, warnings } = mapChores(grocyChores, options.familyId, defaultUserId);
       report.warnings.push(...warnings);
-      for (let i = 0; i < lists.length; i++) { const lr = await db.insert(schema.hhLists).values(lists[i]).returning(); await db.insert(schema.hhListItems).values({ ...choreItems[i], listId: lr[0].id }); }
+      for (let i = 0; i < lists.length; i++) { const lr = db.insert(schema.hhLists).values(lists[i]).run(); db.insert(schema.hhListItems).values({ ...choreItems[i], listId: Number(lr.lastInsertRowid) }).run(); }
       report.summary.chores = lists.length; console.log(`  ✓ 家务: ${lists.length}`);
     }
 

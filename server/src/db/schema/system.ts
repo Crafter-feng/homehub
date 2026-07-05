@@ -6,6 +6,18 @@ import { sqliteTable, text, integer, real, unique, uniqueIndex } from 'drizzle-o
 import { families, users } from './auth';
 import { mdLocations } from './master-data';
 
+// ── 扫码日志 ──
+export const sysTriggerLogs = sqliteTable('sys_trigger_logs', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  familyId: integer('family_id').notNull().references(() => families.id),
+  userId: integer('user_id'),
+  scanType: text('scan_type').notNull(),
+  code: text('code').notNull(),
+  action: text('action').notNull(),
+  context: text('context'),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
+});
+
 // ── 扫码绑定 ──
 export const sysTriggerBindings = sqliteTable('sys_trigger_bindings', {
   id: integer('id').primaryKey({ autoIncrement: true }),

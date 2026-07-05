@@ -64,10 +64,9 @@ export function mapShops(shops: GrocyShop[], familyId: number): MapResult<HhShop
   return { items: shops.map(s => ({ familyId, name: s.name, icon: null, address: null, notes: s.description || null, createdAt: parseGrocyTimestamp(s.row_created_timestamp) })), warnings: [] };
 }
 
-export function mapProductsAndStock(products: GrocyProduct[], stockEntries: GrocyStock[], barcodes: GrocyProductBarcode[], units: GrocyQuantityUnit[], locations: GrocyLocation[], familyId: number, shopMap: Map<number, string> = new Map(), categoryMap: Map<number, number> = new Map(), categoryNameMap: Map<number, string> = new Map()): { products: HhProductInsert[]; items: HhItemInsert[]; batches: HhBatchInsert[]; warnings: string[] } {
+export function mapProductsAndStock(products: GrocyProduct[], stockEntries: GrocyStock[], barcodes: GrocyProductBarcode[], units: GrocyQuantityUnit[], _locations: GrocyLocation[], familyId: number, shopMap: Map<number, string> = new Map(), categoryMap: Map<number, number> = new Map(), categoryNameMap: Map<number, string> = new Map(), locationIdMap: Map<number, number> = new Map()): { products: HhProductInsert[]; items: HhItemInsert[]; batches: HhBatchInsert[]; warnings: string[] } {
   const warnings: string[] = [];
   const unitMap = new Map<number, string>(); units.forEach(u => unitMap.set(u.id, u.name));
-  const locationMap = new Map<number, number>(); locations.forEach((loc, idx) => locationMap.set(loc.id, idx + 1));
   const barcodeByProduct = new Map<number, GrocyProductBarcode[]>();
   for (const bc of barcodes) { const arr = barcodeByProduct.get(bc.product_id) || []; arr.push(bc); barcodeByProduct.set(bc.product_id, arr); }
   const stockByProduct = new Map<number, GrocyStock[]>();
@@ -81,32 +80,33 @@ export function mapProductsAndStock(products: GrocyProduct[], stockEntries: Groc
     const p = products[idx];
     const hhProductId = idx + 1;
     const primaryBarcode = barcodeByProduct.get(p.id)?.[0]?.barcode || null;
-    productItems.push({ familyId, name: p.name, barcode: primaryBarcode, categoryId: categoryMap.get(p.product_group_id) || null, unit: unitMap.get(p.qu_id_stock) || '个', brand: null, defaultPrice: null, notes: p.description || null, createdAt: parseGrocyTimestamp(p.row_created_timestamp), updatedAt: new Date() });
-
     const productStock = stockByProduct.get(p.id) || [];
+    const primaryStock = productStock[0];
+    const defaultPrice = primaryStock?.price || null;
+
+    productItems.push({ familyId, name: p.name, barcode: primaryBarcode, categoryId: categoryMap.get(p.product_group_id) || null, unit: unitMap.get(p.qu_id_stock) || '个', brand: null, defaultPrice, notes: p.description || null, createdAt: parseGrocyTimestamp(p.row_created_timestamp), updatedAt: new Date() });
+
     const totalQuantity = productStock.reduce((sum, s) => sum + s.amount, 0);
 
     if (productStock.length > 0) {
-      const primaryStock = productStock[0];
-      const itemId = invItems.length + 1;
-      invItems.push({ familyId, productId: hhProductId, name: p.name, type: categoryNameMap.get(p.product_group_id) || 'generic', barcode: primaryBarcode, categoryId: categoryMap.get(p.product_group_id) || null, locationId: locationMap.get(primaryStock.location_id) || locationMap.get(p.location_id) || null, quantity: totalQuantity, unit: unitMap.get(p.qu_id_stock) || '个', minStock: p.min_stock_amount || 0, brand: null, shop: (p.shopping_location_id ? shopMap.get(Number(p.shopping_location_id)) : null) || null, notes: primaryStock.note || p.description || null, expiryDate: parseDate(primaryStock.best_before_date), purchaseDate: parseDate(primaryStock.purchased_date), purchasePrice: primaryStock.price || null, createdAt: parseGrocyTimestamp(p.row_created_timestamp), updatedAt: new Date() });
-      for (const s of productStock) { batches.push({ productId: hhProductId, batchNumber: s.stock_id || null, quantity: s.amount, unit: unitMap.get(p.qu_id_stock) || '个', purchaseDate: parseDate(s.purchased_date), expiryDate: parseDate(s.best_before_date), locationId: locationMap.get(s.location_id) || null, shop: shopMap.get(Number(p.shopping_location_id)) || null, price: s.price || null, createdAt: parseGrocyTimestamp(s.row_created_timestamp) }); }
+      invItems.push({ familyId, productId: hhProductId, name: p.name, type: categoryNameMap.get(p.product_group_id) || 'generic', barcode: primaryBarcode, categoryId: categoryMap.get(p.product_group_id) || null, locationId: locationIdMap.get(primaryStock.location_id) || locationIdMap.get(p.location_id) || null, quantity: totalQuantity, unit: unitMap.get(p.qu_id_stock) || '个', minStock: p.min_stock_amount || 0, brand: null, shop: (primaryStock.shopping_location_id ? shopMap.get(primaryStock.shopping_location_id) : null) || (p.shopping_location_id ? shopMap.get(p.shopping_location_id) : null) || null, notes: primaryStock.note || p.description || null, expiryDate: parseDate(primaryStock.best_before_date), purchaseDate: parseDate(primaryStock.purchased_date), purchasePrice: primaryStock.price || null, createdAt: parseGrocyTimestamp(p.row_created_timestamp), updatedAt: new Date() });
+      for (const s of productStock) { batches.push({ productId: hhProductId, batchNumber: s.stock_id || null, quantity: s.amount, unit: unitMap.get(p.qu_id_stock) || '个', purchaseDate: parseDate(s.purchased_date), expiryDate: parseDate(s.best_before_date), locationId: locationIdMap.get(s.location_id) || null, shop: (s.shopping_location_id ? shopMap.get(s.shopping_location_id) : null) || (p.shopping_location_id ? shopMap.get(p.shopping_location_id) : null) || null, price: s.price || null, createdAt: parseGrocyTimestamp(s.row_created_timestamp) }); }
     } else {
-      invItems.push({ familyId, productId: hhProductId, name: p.name, type: categoryNameMap.get(p.product_group_id) || 'generic', barcode: primaryBarcode, categoryId: categoryMap.get(p.product_group_id) || null, locationId: locationMap.get(p.location_id) || null, quantity: 0, unit: unitMap.get(p.qu_id_stock) || '个', minStock: p.min_stock_amount || 0, brand: null, shop: (p.shopping_location_id ? shopMap.get(Number(p.shopping_location_id)) : null) || null, notes: p.description || null, expiryDate: null, purchaseDate: null, purchasePrice: null, createdAt: parseGrocyTimestamp(p.row_created_timestamp), updatedAt: new Date() });
+      invItems.push({ familyId, productId: hhProductId, name: p.name, type: categoryNameMap.get(p.product_group_id) || 'generic', barcode: primaryBarcode, categoryId: categoryMap.get(p.product_group_id) || null, locationId: locationIdMap.get(p.location_id) || null, quantity: 0, unit: unitMap.get(p.qu_id_stock) || '个', minStock: p.min_stock_amount || 0, brand: null, shop: (p.shopping_location_id ? shopMap.get(p.shopping_location_id) : null) || null, notes: p.description || null, expiryDate: null, purchaseDate: null, purchasePrice: null, createdAt: parseGrocyTimestamp(p.row_created_timestamp), updatedAt: new Date() });
     }
   }
   if (products.length === 0) warnings.push('Grocy 中没有产品');
   return { products: productItems, items: invItems, batches, warnings };
 }
 
-export function mapStockLog(stockLogs: GrocyStockLog[], productToItemMap: Map<number, number>, familyId: number, defaultUserId: number, unitMap?: Map<number, string>, shopMap?: Map<number, string>, locationMap?: Map<number, number>): MapResult<HhStockTxInsert> {
+export function mapStockLog(stockLogs: GrocyStockLog[], productToItemMap: Map<number, number>, familyId: number, defaultUserId: number, unitMap?: Map<number, string>, shopMap?: Map<number, string>, locationIdMap?: Map<number, number>, productUnitMap?: Map<number, string>): MapResult<HhStockTxInsert> {
   const warnings: string[] = [];
   const items: HhStockTxInsert[] = [];
   for (const log of stockLogs) {
     const productId = productToItemMap.get(log.product_id);
     if (productId === undefined) { warnings.push(`stock_log product_id=${log.product_id} 未找到对应 product，已跳过`); continue; }
-    const shopName = shopMap?.get(log.location_id) || null;
-    items.push({ productId, batchId: null, type: mapStockTxType(log.transaction_type), quantity: Math.abs(log.amount), unit: unitMap?.get(log.product_id) || '个', fromLocationId: null, toLocationId: locationMap?.get(log.location_id) || null, userId: log.user_id || defaultUserId, source: 'manual', note: log.note || log.transaction_type, price: log.price || null, shop: shopName, spec: null, createdAt: parseGrocyTimestamp(log.row_created_timestamp) });
+    const shopName = (log.shopping_location_id ? shopMap?.get(log.shopping_location_id) : null) || null;
+    items.push({ productId, batchId: null, type: mapStockTxType(log.transaction_type), quantity: Math.abs(log.amount), unit: productUnitMap?.get(log.product_id) || '个', fromLocationId: null, toLocationId: locationIdMap?.get(log.location_id) || null, userId: log.user_id || defaultUserId, source: 'manual', note: log.note || log.transaction_type, price: log.price || null, shop: shopName, spec: null, createdAt: parseGrocyTimestamp(log.row_created_timestamp) });
   }
   return { items, warnings };
 }

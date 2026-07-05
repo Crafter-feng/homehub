@@ -526,7 +526,7 @@ CREATE TABLE IF NOT EXISTS `sys_rfid_zones` (
   FOREIGN KEY (`location_id`) REFERENCES `md_locations`(`id`)
 );
 
-CREATE TABLE IF NOT EXISTS `sys_tigger_logs` (
+CREATE TABLE IF NOT EXISTS `sys_trigger_logs` (
   `id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
   `family_id` integer NOT NULL,
   `user_id` integer,
@@ -537,7 +537,7 @@ CREATE TABLE IF NOT EXISTS `sys_tigger_logs` (
   `created_at` integer NOT NULL,
   FOREIGN KEY (`family_id`) REFERENCES `families`(`id`)
 );
-CREATE INDEX IF NOT EXISTS `idx_sys_tigger_logs_family` ON `sys_tigger_logs`(`family_id`);
+CREATE INDEX IF NOT EXISTS `idx_sys_trigger_logs_family` ON `sys_trigger_logs`(`family_id`);
 
 CREATE TABLE IF NOT EXISTS `sys_trigger_bindings` (
   `id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
