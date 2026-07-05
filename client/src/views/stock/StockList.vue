@@ -692,8 +692,8 @@
       @updated="onItemUpdated"
     />
 
-    <ItemEditDialog
-      v-model:show="showItemEditDialog"
+    <StockItemFormDialog
+      v-model:visible="showItemFormDialog"
       :item="editingItem"
       @saved="onItemUpdated"
     />
@@ -731,7 +731,7 @@ import {
 import { getCategoryColor } from '@/utils/format';
 import ProductFormDialog from '@/components/ProductFormDialog.vue';
 import ItemDetailModal from '@/components/ItemDetailModal.vue';
-import ItemEditDialog from '@/components/ItemEditDialog.vue';
+import StockItemFormDialog from '@/components/StockItemFormDialog.vue';
 import { clientRegistry } from '@/plugins/client-registry';
 import type { ScanResult } from '@/plugins/types/client-plugin.types';
 
@@ -905,7 +905,7 @@ function toggleColumn(key: string, visible: boolean) {
 const inlineActionItem = ref<Item | null>(null);
 const showInlineStockInModal = ref(false);
 const showInlineConsumeModal = ref(false);
-const showItemEditDialog = ref(false);
+const showItemFormDialog = ref(false);
 const editingItem = ref<Item | null>(null);
 const inlineStockInQty = ref(1);
 const inlineStockInPrice = ref<number | null>(null);
@@ -1518,7 +1518,7 @@ function handleMoreAction(key: string, item: Item) {
       break;
     case 'edit':
       editingItem.value = item;
-      showItemEditDialog.value = true;
+      showItemFormDialog.value = true;
       break;
   }
 }
