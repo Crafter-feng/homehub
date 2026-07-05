@@ -143,6 +143,10 @@ export class UpdateItemDto {
 
   @IsString()
   @IsOptional()
+  spec?: string;
+
+  @IsString()
+  @IsOptional()
   notes?: string;
 
   @IsString()

@@ -202,6 +202,7 @@ export default {
     title: 'Stock Management',
     subtitle: 'Manage household supplies',
     addItem: 'Add Item',
+    editItem: 'Edit Item',
     scanAdd: 'Scan to Add',
     name: 'Name',
     quantity: 'Quantity',

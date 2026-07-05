@@ -139,6 +139,7 @@ export default {
     quickActions: '快捷操作',
     recentActivity: '最近活动',
     addItem: '添加物品',
+    editItem: '编辑物品',
     addItemDesc: '录入新库存',
     shoppingList: '购物清单',
     shoppingListDesc: '创建采购清单',

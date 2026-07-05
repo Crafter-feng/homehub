@@ -132,11 +132,15 @@ export class StockService {
     const updates = pickDefined(dto as Record<string, unknown>, [
       'name', 'type', 'barcode', 'categoryId', 'locationId',
       'quantity', 'unit', 'minStock', 'brand', 'notes', 'image',
-      'purchasePrice', 'currency', 'customFields',
+      'purchasePrice', 'currency', 'customFields', 'shop', 'spec',
     ]);
 
     if (dto.expiryDate !== undefined) {
       (updates as Record<string, unknown>).expiryDate = dto.expiryDate ? new Date(dto.expiryDate) : null;
+    }
+
+    if (dto.purchaseDate !== undefined) {
+      (updates as Record<string, unknown>).purchaseDate = dto.purchaseDate ? new Date(dto.purchaseDate) : null;
     }
 
     // Handle "opened" state change — auto-adjust expiry + auto-transfer
