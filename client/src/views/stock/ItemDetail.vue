@@ -29,7 +29,7 @@
               {{ item.barcode }}
             </n-tag>
             <n-button size="tiny" quaternary @click="showQRCode = true">
-              <template #icon><n-icon :size="14"><QRCodeOutline /></n-icon></template>
+              <template #icon><n-icon :size="14"><CodeOutline /></n-icon></template>
             </n-button>
           </div>
         </div>
@@ -235,7 +235,7 @@ import {
 import { stockApi, locationsApi } from '@/api/client';
 import PluginSlot from '@/components/PluginSlot.vue';
 import PriceHistoryChart from '@/components/PriceHistoryChart.vue';
-import { ArrowBackOutline, BarcodeOutline, QRCodeOutline, DownloadOutline } from '@vicons/ionicons5';
+import { ArrowBackOutline, BarcodeOutline, CodeOutline, DownloadOutline } from '@vicons/ionicons5';
 import { useI18n } from '@/locales';
 import { useStockItem } from '@/composables/useStockItem';
 import { getCategoryColor, getHistoryColor } from '@/utils/format';

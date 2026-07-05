@@ -28,7 +28,7 @@
               {{ item.barcode }}
             </n-tag>
             <n-button size="tiny" quaternary @click="showQRCode = true">
-              <template #icon><n-icon :size="14"><QRCodeOutline /></n-icon></template>
+              <template #icon><n-icon :size="14"><CodeOutline /></n-icon></template>
             </n-button>
           </div>
         </div>
@@ -248,7 +248,7 @@ import {
   NModal, NSpin, NButton, NSpace, NFormItem, NEmpty, NIcon, NCheckbox,
   NInputNumber, NInput, NSelect, NTag, NTabs, NTabPane, useMessage, useDialog,
 } from 'naive-ui';
-import { BarcodeOutline, QRCodeOutline, DownloadOutline } from '@vicons/ionicons5';
+import { BarcodeOutline, CodeOutline, DownloadOutline } from '@vicons/ionicons5';
 import { stockApi, locationsApi } from '@/api/client';
 import PriceHistoryChart from './PriceHistoryChart.vue';
 import BatchEditDialog from './BatchEditDialog.vue';
