@@ -115,6 +115,10 @@ export default {
     mcp: 'MCP',
     unknown: 'Unknown',
     noData: 'No records',
+    purchase: 'Purchase',
+    'product-opened': 'Opened',
+    'stock-edit-old': 'Stock Adjustment',
+    'stock-edit-new': 'Stock Adjustment',
   },
   sidebar: {
     admin: 'Admin',

@@ -125,7 +125,7 @@
                 </div>
                 <div class="timeline-meta">
                   <span v-if="record.source" class="meta-source">{{ translateSource(record.source) }}</span>
-                  <span v-if="record.note">{{ record.note }}</span>
+                  <span v-if="record.note" class="meta-note">{{ translateNote(record.note) }}</span>
                   <span>{{ formatDateTime(record.createdAt) }}</span>
                 </div>
               </div>
@@ -234,6 +234,11 @@ const {
 
 const translateType = (type: string): string => t(`history.${type}`) || type;
 const translateSource = (source: string): string => t(`history.${source}`) || source;
+const translateNote = (note: string): string => {
+  const knownTypes = ['purchase', 'consume', 'product-opened', 'stock-edit-old', 'stock-edit-new'];
+  if (knownTypes.includes(note)) return t(`history.${note}`);
+  return note;
+};
 
 // Shop autocomplete from price history (loaded via ItemDetailModal's pattern)
 const shopOptions = computed(() => {

@@ -115,6 +115,10 @@ export default {
     mcp: 'MCP',
     unknown: '未知',
     noData: '暂无操作记录',
+    purchase: '采购',
+    'product-opened': '已开封',
+    'stock-edit-old': '库存调整',
+    'stock-edit-new': '库存调整',
   },
   sidebar: {
     admin: '管理员',
