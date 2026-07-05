@@ -8,8 +8,13 @@ export { users, families, familyMembers, apiTokens, refreshTokens } from './auth
 // ── 主数据 ──
 export { mdLocations, mdCategories, mdTags, mdItemTags, mdUnits, mdBrands, mdShops } from './master-data';
 
-// ── 库存（产品 + 物品 + 流水 + 文档） ──
-export { invProducts, invItems, invItemBatches, invStockTransactions, invDocuments } from './inventory';
+// ── 库存（产品 + 批次 + 流水 + 文档） ──
+export { invProducts, invBatches, invStockLog, invProductBarcodes, invDocuments } from './inventory';
+
+// 兼容别名（旧代码过渡用，后续删除）
+export { invProducts as invItems } from './inventory';
+export { invBatches as invItemBatches } from './inventory';
+export { invStockLog as invStockTransactions } from './inventory';
 
 // ── 家庭生活（列表/食谱/餐计划/日历/预算） ──
 export {

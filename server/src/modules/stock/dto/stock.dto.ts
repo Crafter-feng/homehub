@@ -1,14 +1,10 @@
 import { IsString, IsNumber, IsOptional, Min, MaxLength } from 'class-validator';
 import { Transform } from 'class-transformer';
 
-export class CreateItemDto {
+export class CreateProductDto {
   @IsString()
   @MaxLength(100)
   name: string;
-
-  @IsString()
-  @IsOptional()
-  type?: string;
 
   @IsString()
   @IsOptional()
@@ -18,18 +14,21 @@ export class CreateItemDto {
   @IsOptional()
   categoryId?: number;
 
-  @IsNumber()
-  @IsOptional()
-  locationId?: number;
-
-  @IsNumber()
-  @Min(0)
-  @IsOptional()
-  quantity?: number;
-
   @IsString()
   @IsOptional()
   unit?: string;
+
+  @IsString()
+  @IsOptional()
+  brand?: string;
+
+  @IsString()
+  @IsOptional()
+  image?: string;
+
+  @IsNumber()
+  @IsOptional()
+  locationId?: number;
 
   @IsNumber()
   @Min(0)
@@ -38,51 +37,43 @@ export class CreateItemDto {
 
   @IsString()
   @IsOptional()
-  brand?: string;
-
-  @IsString()
-  @IsOptional()
   shop?: string;
 
+  @IsNumber()
+  @IsOptional()
+  defaultPrice?: number;
+
+  @IsNumber()
+  @IsOptional()
+  defaultBestBeforeDays?: number;
+
+  @IsNumber()
+  @IsOptional()
+  defaultBestBeforeDaysAfterOpen?: number;
+
+  @IsNumber()
+  @IsOptional()
+  moveOnOpenLocationId?: number;
+
   @IsString()
   @IsOptional()
-  notes?: string;
+  purchaseUnit?: string;
 
   @IsString()
   @IsOptional()
-  image?: string;
-
-  @IsNumber()
-  @IsOptional()
-  purchasePrice?: number;
+  stockUnit?: string;
 
   @IsString()
   @IsOptional()
-  currency?: string;
-
-  @Transform(({ value }) => {
-    if (value === null || value === undefined) return undefined;
-    if (typeof value === 'number') return value;
-    if (typeof value === 'string') return new Date(value).getTime();
-    return value;
-  })
-  @IsNumber()
-  @IsOptional()
-  purchaseDate?: number;
-
-  @Transform(({ value }) => {
-    if (value === null || value === undefined) return undefined;
-    if (typeof value === 'number') return value;
-    if (typeof value === 'string') return new Date(value).getTime();
-    return value;
-  })
-  @IsNumber()
-  @IsOptional()
-  expiryDate?: number;
+  consumeUnit?: string;
 
   @IsNumber()
   @IsOptional()
-  productId?: number;
+  purchaseToStockFactor?: number;
+
+  @IsNumber()
+  @IsOptional()
+  parentId?: number;
 
   @IsNumber()
   @IsOptional()
@@ -92,20 +83,20 @@ export class CreateItemDto {
   @IsOptional()
   tareWeight?: number;
 
+  @IsString()
   @IsOptional()
-  customFields?: Record<string, unknown>;
+  spec?: string;
+
+  @IsString()
+  @IsOptional()
+  notes?: string;
 }
 
-// UpdateItemDto — independent definition, all fields optional (no inheritance from CreateItemDto)
-export class UpdateItemDto {
+export class UpdateProductDto {
   @IsString()
   @MaxLength(100)
   @IsOptional()
   name?: string;
-
-  @IsString()
-  @IsOptional()
-  type?: string;
 
   @IsString()
   @IsOptional()
@@ -115,18 +106,21 @@ export class UpdateItemDto {
   @IsOptional()
   categoryId?: number;
 
-  @IsNumber()
-  @IsOptional()
-  locationId?: number;
-
-  @IsNumber()
-  @Min(0)
-  @IsOptional()
-  quantity?: number;
-
   @IsString()
   @IsOptional()
   unit?: string;
+
+  @IsString()
+  @IsOptional()
+  brand?: string;
+
+  @IsString()
+  @IsOptional()
+  image?: string;
+
+  @IsNumber()
+  @IsOptional()
+  locationId?: number;
 
   @IsNumber()
   @Min(0)
@@ -135,11 +129,51 @@ export class UpdateItemDto {
 
   @IsString()
   @IsOptional()
-  brand?: string;
+  shop?: string;
+
+  @IsNumber()
+  @IsOptional()
+  defaultPrice?: number;
+
+  @IsNumber()
+  @IsOptional()
+  defaultBestBeforeDays?: number;
+
+  @IsNumber()
+  @IsOptional()
+  defaultBestBeforeDaysAfterOpen?: number;
+
+  @IsNumber()
+  @IsOptional()
+  moveOnOpenLocationId?: number;
 
   @IsString()
   @IsOptional()
-  shop?: string;
+  purchaseUnit?: string;
+
+  @IsString()
+  @IsOptional()
+  stockUnit?: string;
+
+  @IsString()
+  @IsOptional()
+  consumeUnit?: string;
+
+  @IsNumber()
+  @IsOptional()
+  purchaseToStockFactor?: number;
+
+  @IsNumber()
+  @IsOptional()
+  parentId?: number;
+
+  @IsNumber()
+  @IsOptional()
+  caloriesPerUnit?: number;
+
+  @IsNumber()
+  @IsOptional()
+  tareWeight?: number;
 
   @IsString()
   @IsOptional()
@@ -148,125 +182,9 @@ export class UpdateItemDto {
   @IsString()
   @IsOptional()
   notes?: string;
-
-  @IsString()
-  @IsOptional()
-  image?: string;
-
-  @IsNumber()
-  @IsOptional()
-  purchasePrice?: number;
-
-  @IsString()
-  @IsOptional()
-  currency?: string;
-
-  @Transform(({ value }) => {
-    if (value === null || value === undefined) return undefined;
-    if (typeof value === 'number') return value;
-    if (typeof value === 'string') return new Date(value).getTime();
-    return value;
-  })
-  @IsNumber()
-  @IsOptional()
-  purchaseDate?: number;
-
-  @Transform(({ value }) => {
-    if (value === null || value === undefined) return undefined;
-    if (typeof value === 'number') return value;
-    if (typeof value === 'string') return new Date(value).getTime();
-    return value;
-  })
-  @IsNumber()
-  @IsOptional()
-  expiryDate?: number;
-
-  @IsString()
-  @IsOptional()
-  currentState?: string;
-
-  @IsOptional()
-  customFields?: Record<string, unknown>;
 }
 
-export class ConsumeItemDto {
-  @IsNumber()
-  @Min(0.01)
-  quantity: number;
-
-  @IsString()
-  @IsOptional()
-  note?: string;
-
-  @IsNumber()
-  @IsOptional()
-  batchId?: number;
-
-  @IsNumber()
-  @Min(0)
-  @IsOptional()
-  spoiled?: number;
-
-  @IsNumber()
-  @IsOptional()
-  recipeId?: number;
-}
-
-export class UpdateBatchDto {
-  @IsString()
-  @IsOptional()
-  batchNumber?: string;
-
-  @IsNumber()
-  @Min(0)
-  @IsOptional()
-  quantity?: number;
-
-  @Transform(({ value }) => {
-    if (value === null || value === undefined) return undefined;
-    if (typeof value === 'number') return value;
-    if (typeof value === 'string') return new Date(value).getTime();
-    return value;
-  })
-  @IsNumber()
-  @IsOptional()
-  expiryDate?: number;
-
-  @Transform(({ value }) => {
-    if (value === null || value === undefined) return undefined;
-    if (typeof value === 'number') return value;
-    if (typeof value === 'string') return new Date(value).getTime();
-    return value;
-  })
-  @IsNumber()
-  @IsOptional()
-  purchaseDate?: number;
-
-  @IsNumber()
-  @IsOptional()
-  locationId?: number;
-}
-
-export class TransferItemDto {
-  @IsNumber()
-  toLocationId: number;
-
-  @IsNumber()
-  @Min(0.01)
-  @IsOptional()
-  quantity?: number;
-}
-
-export class AdjustItemDto {
-  @IsNumber()
-  quantity: number;
-
-  @IsString()
-  @IsOptional()
-  note?: string;
-}
-
-export class StockInItemDto {
+export class StockInDto {
   @IsNumber()
   @Min(0.01)
   quantity: number;
@@ -310,33 +228,59 @@ export class StockInItemDto {
   @IsNumber()
   @IsOptional()
   locationId?: number;
-
-  @IsNumber()
-  @IsOptional()
-  productId?: number;
 }
 
-export class CreateBatchDto {
-  @IsString()
-  @IsOptional()
-  batchNumber?: string;
-
+export class ConsumeDto {
   @IsNumber()
   @Min(0.01)
   quantity: number;
 
   @IsString()
-  unit: string;
+  @IsOptional()
+  note?: string;
 
-  @Transform(({ value }) => {
-    if (value === null || value === undefined) return undefined;
-    if (typeof value === 'number') return value;
-    if (typeof value === 'string') return new Date(value).getTime();
-    return value;
-  })
   @IsNumber()
   @IsOptional()
-  purchaseDate?: number;
+  batchId?: number;
+
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  spoiled?: number;
+
+  @IsNumber()
+  @IsOptional()
+  recipeId?: number;
+}
+
+export class TransferDto {
+  @IsNumber()
+  toLocationId: number;
+
+  @IsNumber()
+  @Min(0.01)
+  @IsOptional()
+  quantity?: number;
+}
+
+export class AdjustDto {
+  @IsNumber()
+  quantity: number;
+
+  @IsString()
+  @IsOptional()
+  note?: string;
+}
+
+export class UpdateBatchDto {
+  @IsString()
+  @IsOptional()
+  batchNumber?: string;
+
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  quantity?: number;
 
   @Transform(({ value }) => {
     if (value === null || value === undefined) return undefined;
@@ -348,7 +292,25 @@ export class CreateBatchDto {
   @IsOptional()
   expiryDate?: number;
 
+  @Transform(({ value }) => {
+    if (value === null || value === undefined) return undefined;
+    if (typeof value === 'number') return value;
+    if (typeof value === 'string') return new Date(value).getTime();
+    return value;
+  })
+  @IsNumber()
+  @IsOptional()
+  purchaseDate?: number;
+
   @IsNumber()
   @IsOptional()
   locationId?: number;
+
+  @IsString()
+  @IsOptional()
+  shop?: string;
+
+  @IsNumber()
+  @IsOptional()
+  price?: number;
 }

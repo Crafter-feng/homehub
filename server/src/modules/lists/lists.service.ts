@@ -2,7 +2,7 @@ import { Injectable, Inject, NotFoundException, ForbiddenException } from '@nest
 import { DATABASE_TOKEN } from '../../db/database.module';
 import { eq, and, sql, desc, inArray } from 'drizzle-orm';
 import { hhLists, hhListItems, hhListItemComments, hhHolidayTemplates } from '../../db/schema';
-import { invItems, invStockTransactions } from '../../db/schema';
+import { invProducts, invBatches, invStockLog } from '../../db/schema';
 import { CreateListDto, UpdateListDto, AddListItemDto, UpdateListItemDto, AssignListItemDto, AddCommentDto } from './dto/list.dto';
 
 @Injectable()
@@ -98,7 +98,7 @@ export class ListsService {
       assigneeId: dto.assigneeId,
       quantity: dto.quantity,
       unit: dto.unit,
-      linkedItemId: dto.linkedItemId,
+      linkedProductId: dto.linkedProductId,
       linkedRecipeId: dto.linkedRecipeId,
       dueAt: dto.dueAt ? new Date(dto.dueAt) : null,
     }).returning().get();
@@ -158,18 +158,18 @@ export class ListsService {
       }).where(eq(hhListItems.id, itemId)).run();
 
       // 购物清单：打勾自动入库
-      if (list?.type === 'shopping' && item.linkedItemId) {
-        const stockItem = tx.select().from(invItems)
-          .where(eq(invItems.id, item.linkedItemId))
+      if (list?.type === 'shopping' && item.linkedProductId) {
+        const stockItem = tx.select().from(invProducts)
+          .where(eq(invProducts.id, item.linkedProductId))
           .get();
         if (stockItem) {
-          tx.update(invItems).set({
+          tx.update(invProducts).set({
             quantity: stockItem.quantity + (item.quantity || 1),
             updatedAt: new Date(),
-          }).where(eq(invItems.id, item.linkedItemId)).run();
+          }).where(eq(invProducts.id, item.linkedProductId)).run();
 
-          tx.insert(invStockTransactions).values({
-            itemId: item.linkedItemId,
+          tx.insert(invStockLog).values({
+            itemId: item.linkedProductId,
             type: 'add',
             quantity: item.quantity || 1,
             unit: stockItem.unit || '个',
@@ -272,8 +272,8 @@ export class ListsService {
     });
 
     // 从模板创建条目
-    if (template.invItems) {
-      for (const item of template.invItems as any[]) {
+    if (template.invProducts) {
+      for (const item of template.invProducts as any[]) {
         await this.addItem(list.id, familyId, {
           content: item.name,
           quantity: item.quantity,
@@ -288,16 +288,22 @@ export class ListsService {
 
   // === 自动补货 ===
   async autoReplenish(familyId: number, userId: number) {
-    // 查询低于阈值的物品（批量）
-    const lowStockItems = await this.db.select().from(invItems)
+    // 查询低于阈值的产品（通过批次聚合数量）
+    const lowStockProducts = await this.db.select({
+      productId: invBatches.productId,
+      totalQuantity: sql<number>`COALESCE(SUM(${invBatches.quantity}), 0)`,
+    })
+      .from(invBatches)
+      .innerJoin(invProducts, eq(invBatches.productId, invProducts.id))
       .where(and(
-        eq(invItems.familyId, familyId),
-        sql`${invItems.minStock} > 0`,
-        sql`${invItems.quantity} <= ${invItems.minStock}`,
+        eq(invProducts.familyId, familyId),
+        sql`${invProducts.minStock} > 0`,
       ))
-      .all();
+      .groupBy(invBatches.productId);
 
-    if (lowStockItems.length === 0) {
+    const filtered = lowStockProducts.filter((p: any) => p.totalQuantity <= 0);
+
+    if (filtered.length === 0) {
       return { added: 0, message: '没有需要补货的物品' };
     }
 
@@ -317,7 +323,7 @@ export class ListsService {
     }
 
     // 批量查询已在清单中的低库存物品，避免 N+1
-    const lowStockIds = lowStockItems.map((i: any) => i.id);
+    const lowStockIds = filtered.map((i: any) => i.id);
     let existingItems: any[];
     if (lowStockIds.length > 0) {
       existingItems = await this.db.select()
@@ -325,16 +331,16 @@ export class ListsService {
         .where(and(
           eq(hhListItems.listId, shoppingList.id),
           eq(hhListItems.status, 'pending'),
-          inArray(hhListItems.linkedItemId, lowStockIds),
+          inArray(hhListItems.linkedProductId, lowStockIds),
         ))
         .all();
     } else {
       existingItems = [];
     }
-    const existingIds = new Set(existingItems.map(e => e.linkedItemId));
+    const existingIds = new Set(existingItems.map(e => e.linkedProductId));
 
     let addedCount = 0;
-    for (const item of lowStockItems) {
+    for (const item of filtered) {
       if (existingIds.has(item.id)) continue;
 
       const needed = item.minStock - item.quantity;
@@ -342,7 +348,7 @@ export class ListsService {
         content: item.name,
         quantity: needed,
         unit: item.unit,
-        linkedItemId: item.id,
+        linkedProductId: item.id,
         notes: `库存 ${item.quantity}${item.unit}，低于阈值 ${item.minStock}${item.unit}`,
       });
       addedCount++;

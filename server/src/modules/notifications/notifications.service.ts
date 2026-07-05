@@ -1,7 +1,7 @@
 import { Injectable, Inject, NotFoundException, Logger } from '@nestjs/common';
 import { DATABASE_TOKEN } from '../../db/database.module';
 import { eq, and, sql, desc } from 'drizzle-orm';
-import { sysNotificationRules, sysNotifications, invItems } from '../../db/schema';
+import { sysNotificationRules, sysNotifications, invItems, invBatches, invProducts } from '../../db/schema';
 import { CreateNotificationRuleDto, UpdateNotificationRuleDto } from './dto/notification.dto';
 import * as http from 'http';
 import * as https from 'https';
@@ -159,19 +159,28 @@ export class NotificationsService {
 
     const nowSeconds = Math.floor(Date.now() / 1000);
 
-    // Query expiring invItems
-    const expiringItems = await this.db.select().from(invItems)
+    // Query expiring products (via batches)
+    const expiringProducts = await this.db.select({
+      productId: invBatches.productId,
+      nextDue: sql<number>`MIN(${invBatches.expiryDate})`,
+    })
+      .from(invBatches)
+      .innerJoin(invProducts, eq(invBatches.productId, invProducts.id))
       .where(and(
-        eq(invItems.familyId, familyId),
-        sql`${invItems.expiryDate} > ${nowSeconds}`,
-        sql`${invItems.expiryDate} <= ${nowSeconds + 7 * 86400}`,
+        eq(invProducts.familyId, familyId),
+        sql`${invBatches.expiryDate} > ${nowSeconds}`,
+        sql`${invBatches.expiryDate} <= ${nowSeconds + 7 * 86400}`,
       ))
-      .all();
+      .groupBy(invBatches.productId);
 
-    const expiredItems = await this.db.select().from(invItems)
+    const expiredProducts = await this.db.select({
+      productId: invBatches.productId,
+    })
+      .from(invBatches)
+      .innerJoin(invProducts, eq(invBatches.productId, invProducts.id))
       .where(and(
-        eq(invItems.familyId, familyId),
-        sql`${invItems.expiryDate} <= ${nowSeconds}`,
+        eq(invProducts.familyId, familyId),
+        sql`${invBatches.expiryDate} <= ${nowSeconds}`,
       ))
       .all();
 
@@ -186,9 +195,9 @@ export class NotificationsService {
       const config = rule.config as any;
       const days = config?.daysBeforeExpiry || 7;
 
-      if (expiringItems.length > 0) {
-        const title = `📅 ${expiringItems.length} 件物品即将过期`;
-        const message = expiringItems.slice(0, 10).map((i: any) =>
+      if (expiringProducts.length > 0) {
+        const title = `📅 ${expiringProducts.length} 件物品即将过期`;
+        const message = expiringProducts.slice(0, 10).map((i: any) =>
           `• ${i.name}（${i.quantity}${i.unit}）过期: ${i.expiryDate ? new Date(i.expiryDate).toLocaleDateString('zh-CN') : '未知'}`
         ).join('\n');
 
@@ -211,7 +220,7 @@ export class NotificationsService {
             message,
             type: 'expiry',
             timestamp: new Date().toISOString(),
-            stats: { expiring: expiringItems.length, expired: expiredItems.length },
+            stats: { expiring: expiringProducts.length, expired: expiredProducts.length },
           });
         }
       }
@@ -219,8 +228,8 @@ export class NotificationsService {
 
     return {
       checked: rules.length,
-      expiring: expiringItems.length,
-      expired: expiredItems.length,
+      expiring: expiringProducts.length,
+      expired: expiredProducts.length,
     };
   }
 

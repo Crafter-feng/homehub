@@ -42,14 +42,21 @@ export type BrandSelect = InferSelectModel<typeof schema.mdBrands>;
 
 // ── inventory ──
 export type ProductSelect = InferSelectModel<typeof schema.invProducts>;
-export type ItemSelect = InferSelectModel<typeof schema.invItems>;
-export type ItemInsert = InferInsertModel<typeof schema.invItems>;
-export type ItemBatchSelect = InferSelectModel<typeof schema.invItemBatches>;
-export type ItemBatchInsert = InferInsertModel<typeof schema.invItemBatches>;
-export type StockTransactionSelect = InferSelectModel<typeof schema.invStockTransactions>;
-export type StockTransactionInsert = InferInsertModel<typeof schema.invStockTransactions>;
+export type ProductInsert = InferInsertModel<typeof schema.invProducts>;
+export type BatchSelect = InferSelectModel<typeof schema.invBatches>;
+export type BatchInsert = InferInsertModel<typeof schema.invBatches>;
+export type StockLogSelect = InferSelectModel<typeof schema.invStockLog>;
+export type StockLogInsert = InferInsertModel<typeof schema.invStockLog>;
 export type DocumentSelect = InferSelectModel<typeof schema.invDocuments>;
 export type DocumentInsert = InferInsertModel<typeof schema.invDocuments>;
+
+// 兼容别名（旧代码过渡用）
+export type ItemSelect = ProductSelect;
+export type ItemInsert = ProductInsert;
+export type ItemBatchSelect = BatchSelect;
+export type ItemBatchInsert = BatchInsert;
+export type StockTransactionSelect = StockLogSelect;
+export type StockTransactionInsert = StockLogInsert;
 
 // ── household ──
 export type ListSelect = InferSelectModel<typeof schema.hhLists>;

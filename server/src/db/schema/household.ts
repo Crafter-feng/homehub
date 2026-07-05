@@ -4,7 +4,7 @@
 
 import { sqliteTable, text, integer, real } from 'drizzle-orm/sqlite-core';
 import { families, users } from './auth';
-import { invItems } from './inventory';
+import { invProducts } from './inventory';
 
 // ── 列表 ──
 export const hhLists = sqliteTable('hh_lists', {
@@ -41,7 +41,7 @@ export const hhListItems = sqliteTable('hh_list_items', {
   assigneeId: integer('assignee_id').references(() => users.id),
   quantity: real('quantity'),
   unit: text('unit'),
-  linkedItemId: integer('linked_item_id').references(() => invItems.id),
+  linkedProductId: integer('linked_product_id').references(() => invProducts.id),
   linkedRecipeId: integer('linked_recipe_id'),
   dueAt: integer('due_at', { mode: 'timestamp' }),
   lastResetAt: integer('last_reset_at', { mode: 'timestamp' }),

@@ -38,10 +38,10 @@ export class DocumentsService {
     return result;
   }
 
-  async list(familyId: number, itemId?: number) {
-    if (itemId) {
+  async list(familyId: number, productId?: number) {
+    if (productId) {
       return this.db.select().from(invDocuments)
-        .where(and(eq(invDocuments.familyId, familyId), eq(invDocuments.itemId, itemId)))
+        .where(and(eq(invDocuments.familyId, familyId), eq(invDocuments.productId, productId)))
         .all();
     }
     return this.db.select().from(invDocuments)

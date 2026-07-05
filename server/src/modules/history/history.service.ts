@@ -1,9 +1,8 @@
-import { Injectable, Inject } from '@nestjs/common';
+import { Injectable, Inject, NotFoundException } from '@nestjs/common';
 import { DATABASE_TOKEN } from '../../db/database.module';
 import { eq, and, desc, sql, gte, lte } from 'drizzle-orm';
-import { invStockTransactions, invItems, users } from '../../db/schema';
-import { PaginationQuery, PaginationResponse } from '../../common/dto/pagination.dto';
-import { TimelineQueryDto } from './dto/history.dto';
+import { invStockLog, invProducts, users } from '../../db/schema';
+import { PaginationQuery, PaginationResponse } from '../../common';
 
 @Injectable()
 export class HistoryService {
@@ -11,149 +10,123 @@ export class HistoryService {
     @Inject(DATABASE_TOKEN) private readonly db: any,
   ) {}
 
-  /**
-   * 获取单物品完整变更记录（需验证 familyId 归属）
-   */
   async getItemHistory(itemId: number, familyId: number) {
-    // Verify item belongs to family (prevent cross-family access)
-    const item = await this.db.select().from(invItems)
-      .where(and(eq(invItems.id, itemId), eq(invItems.familyId, familyId)))
+    const item = await this.db.select().from(invProducts)
+      .where(and(eq(invProducts.id, itemId), eq(invProducts.familyId, familyId)))
       .get();
     if (!item) return [];
 
     return this.db.select({
-      id: invStockTransactions.id,
-      itemId: invStockTransactions.itemId,
-      batchId: invStockTransactions.batchId,
-      type: invStockTransactions.type,
-      quantity: invStockTransactions.quantity,
-      unit: invStockTransactions.unit,
-      fromLocationId: invStockTransactions.fromLocationId,
-      toLocationId: invStockTransactions.toLocationId,
-      userId: invStockTransactions.userId,
-      source: invStockTransactions.source,
-      note: invStockTransactions.note,
-      createdAt: invStockTransactions.createdAt,
+      id: invStockLog.id,
+      productId: invStockLog.productId,
+      batchId: invStockLog.batchId,
+      type: invStockLog.type,
+      quantity: invStockLog.quantity,
+      unit: invStockLog.unit,
+      fromLocationId: invStockLog.fromLocationId,
+      toLocationId: invStockLog.toLocationId,
+      userId: invStockLog.userId,
+      source: invStockLog.source,
+      note: invStockLog.note,
+      createdAt: invStockLog.createdAt,
       userName: users.name,
     })
-      .from(invStockTransactions)
-      .leftJoin(users, eq(invStockTransactions.userId, users.id))
-      .where(eq(invStockTransactions.itemId, itemId))
-      .orderBy(desc(invStockTransactions.createdAt))
+      .from(invStockLog)
+      .leftJoin(users, eq(invStockLog.userId, users.id))
+      .where(eq(invStockLog.productId, itemId))
+      .orderBy(desc(invStockLog.createdAt))
       .all();
   }
 
-  /**
-   * 家庭级时间线：join invItems + users 过滤 familyId + 条件过滤 + 分页
-   */
-  async getFamilyTimeline(familyId: number, filters: TimelineQueryDto, pagination: PaginationQuery) {
-    const conditions: any[] = [eq(invItems.familyId, familyId)];
+  async getFamilyTimeline(familyId: number, filters: any, pagination: PaginationQuery) {
+    const page = pagination?.page ?? 1;
+    const limit = pagination?.limit ?? 20;
+    const offset = (page - 1) * limit;
 
-    if (filters.type) {
-      conditions.push(eq(invStockTransactions.type, filters.type as any));
+    const conditions: any[] = [eq(invProducts.familyId, familyId)];
+
+    if (filters?.type) {
+      conditions.push(eq(invStockLog.type, filters.type));
     }
-    if (filters.source) {
-      conditions.push(eq(invStockTransactions.source, filters.source as any));
+    if (filters?.source) {
+      conditions.push(eq(invStockLog.source, filters.source));
     }
-    if (filters.startDate) {
+    if (filters?.startDate) {
       const startDate = new Date(filters.startDate);
-      conditions.push(gte(invStockTransactions.createdAt, startDate));
+      conditions.push(gte(invStockLog.createdAt, startDate));
     }
-    if (filters.endDate) {
+    if (filters?.endDate) {
       const endDate = new Date(filters.endDate);
-      conditions.push(lte(invStockTransactions.createdAt, endDate));
+      conditions.push(lte(invStockLog.createdAt, endDate));
     }
-    if (filters.itemId) {
-      conditions.push(eq(invStockTransactions.itemId, filters.itemId));
-    }
-    if (filters.userId) {
-      conditions.push(eq(invStockTransactions.userId, filters.userId));
+    if (filters?.userId) {
+      conditions.push(eq(invStockLog.userId, filters.userId));
     }
 
-    const whereClause = and(...conditions);
+    const [{ total }] = await this.db
+      .select({ total: sql<number>`count(*)` })
+      .from(invStockLog)
+      .innerJoin(invProducts, eq(invStockLog.productId, invProducts.id))
+      .where(and(...conditions));
 
-    // 查询总数
-    const countResult = await this.db.select({ count: sql<number>`count(*)` })
-      .from(invStockTransactions)
-      .innerJoin(invItems, eq(invStockTransactions.itemId, invItems.id))
-      .where(whereClause)
-      .get();
-    const total = countResult?.count ?? 0;
-
-    // 分页查询数据（含 userName）
-    const offset = (pagination.page - 1) * pagination.limit;
     const data = await this.db.select({
-      id: invStockTransactions.id,
-      itemId: invStockTransactions.itemId,
-      batchId: invStockTransactions.batchId,
-      type: invStockTransactions.type,
-      quantity: invStockTransactions.quantity,
-      unit: invStockTransactions.unit,
-      fromLocationId: invStockTransactions.fromLocationId,
-      toLocationId: invStockTransactions.toLocationId,
-      userId: invStockTransactions.userId,
-      source: invStockTransactions.source,
-      note: invStockTransactions.note,
-      createdAt: invStockTransactions.createdAt,
-      itemName: invItems.name,
+      id: invStockLog.id,
+      productId: invStockLog.productId,
+      batchId: invStockLog.batchId,
+      type: invStockLog.type,
+      quantity: invStockLog.quantity,
+      unit: invStockLog.unit,
+      fromLocationId: invStockLog.fromLocationId,
+      toLocationId: invStockLog.toLocationId,
+      userId: invStockLog.userId,
+      source: invStockLog.source,
+      note: invStockLog.note,
+      createdAt: invStockLog.createdAt,
+      productName: invProducts.name,
       userName: users.name,
     })
-      .from(invStockTransactions)
-      .innerJoin(invItems, eq(invStockTransactions.itemId, invItems.id))
-      .leftJoin(users, eq(invStockTransactions.userId, users.id))
-      .where(whereClause)
-      .orderBy(desc(invStockTransactions.createdAt))
-      .limit(pagination.limit)
+      .from(invStockLog)
+      .innerJoin(invProducts, eq(invStockLog.productId, invProducts.id))
+      .leftJoin(users, eq(invStockLog.userId, users.id))
+      .where(and(...conditions))
+      .orderBy(desc(invStockLog.createdAt))
       .offset(offset)
-      .all();
+      .limit(limit);
 
-    return new PaginationResponse(data, total, pagination.page, pagination.limit);
+    return new PaginationResponse(data, total, page, limit);
   }
 
-  /**
-   * 日志汇总统计
-   */
-  async getJournalSummary(familyId: number) {
-    // 按类型统计
+  async getStats(familyId: number) {
     const byType = await this.db.select({
-      type: invStockTransactions.type,
-      count: sql<number>`count(*)`,
-      totalQuantity: sql<number>`sum(${invStockTransactions.quantity})`,
+      type: invStockLog.type,
+      totalQuantity: sql<number>`sum(${invStockLog.quantity})`,
     })
-      .from(invStockTransactions)
-      .innerJoin(invItems, eq(invStockTransactions.itemId, invItems.id))
-      .where(eq(invItems.familyId, familyId))
-      .groupBy(invStockTransactions.type)
-      .all();
+      .from(invStockLog)
+      .innerJoin(invProducts, eq(invStockLog.productId, invProducts.id))
+      .where(eq(invProducts.familyId, familyId))
+      .groupBy(invStockLog.type);
 
-    // 按用户统计
     const byUser = await this.db.select({
-      userId: invStockTransactions.userId,
+      userId: invStockLog.userId,
       userName: users.name,
-      count: sql<number>`count(*)`,
+      totalQuantity: sql<number>`sum(${invStockLog.quantity})`,
     })
-      .from(invStockTransactions)
-      .innerJoin(invItems, eq(invStockTransactions.itemId, invItems.id))
-      .leftJoin(users, eq(invStockTransactions.userId, users.id))
-      .where(eq(invItems.familyId, familyId))
-      .groupBy(invStockTransactions.userId)
-      .all();
+      .from(invStockLog)
+      .innerJoin(invProducts, eq(invStockLog.productId, invProducts.id))
+      .leftJoin(users, eq(invStockLog.userId, users.id))
+      .where(eq(invProducts.familyId, familyId))
+      .groupBy(invStockLog.userId);
 
-    // 按物品统计（Top 10）
-    const byItem = await this.db.select({
-      itemId: invStockTransactions.itemId,
-      itemName: invItems.name,
-      count: sql<number>`count(*)`,
-      totalQuantity: sql<number>`sum(${invStockTransactions.quantity})`,
+    const byProduct = await this.db.select({
+      productId: invStockLog.productId,
+      productName: invProducts.name,
+      totalQuantity: sql<number>`sum(${invStockLog.quantity})`,
     })
-      .from(invStockTransactions)
-      .innerJoin(invItems, eq(invStockTransactions.itemId, invItems.id))
-      .where(eq(invItems.familyId, familyId))
-      .groupBy(invStockTransactions.itemId)
-      .orderBy(desc(sql`count(*)`))
-      .limit(10)
-      .all();
+      .from(invStockLog)
+      .innerJoin(invProducts, eq(invStockLog.productId, invProducts.id))
+      .where(eq(invProducts.familyId, familyId))
+      .groupBy(invStockLog.productId);
 
-    return { byType, byUser, byItem };
+    return { byType, byUser, byProduct };
   }
 }

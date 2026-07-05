@@ -21,6 +21,6 @@ export class HistoryController {
 
   @Get('journal-summary')
   getJournalSummary(@Request() req: any) {
-    return this.historyService.getJournalSummary(req.user.familyId);
+    return this.historyService.getStats(req.user.familyId);
   }
 }

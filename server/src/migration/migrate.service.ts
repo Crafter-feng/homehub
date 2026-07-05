@@ -123,18 +123,18 @@ export async function migrateFromGrocy(options: MigrationOptions): Promise<Migra
     report.warnings.push(...pResult.warnings);
     if (pResult.products.length > 0) { await db.insert(schema.invProducts).values(pResult.products); report.summary.products = pResult.products.length; console.log(`  ✓ 产品: ${pResult.products.length}`); }
 
-    const insertedItems: Array<{ id: number; productId: number | null }> = [];
-    if (pResult.items.length > 0) { const r = await db.insert(schema.invItems).values(pResult.items).returning(); insertedItems.push(...r); report.summary.items = r.length; console.log(`  ✓ 库存: ${r.length}`); }
+    const insertedProducts: Array<{ id: number }> = [];
+    if (pResult.products.length > 0) { const r = await db.insert(schema.invProducts).values(pResult.products).returning(); insertedProducts.push(...r); report.summary.products = r.length; console.log(`  ✓ 产品: ${r.length}`); }
 
     if (pResult.batches.length > 0) {
-      const batchesWithRealIds = pResult.batches.map(b => ({ ...b, itemId: insertedItems[b.itemId - 1]?.id ?? b.itemId }));
-      await db.insert(schema.invItemBatches).values(batchesWithRealIds); report.summary.batches = batchesWithRealIds.length; console.log(`  ✓ 批次: ${batchesWithRealIds.length}`);
+      const batchesWithRealIds = pResult.batches.map(b => ({ ...b, productId: insertedProducts[b.productId - 1]?.id ?? b.productId }));
+      await db.insert(schema.invBatches).values(batchesWithRealIds); report.summary.batches = batchesWithRealIds.length; console.log(`  ✓ 批次: ${batchesWithRealIds.length}`);
     }
 
-    const productToItemMap = new Map<number, number>();
-    for (let i = 0; i < grocyProducts.length; i++) { if (insertedItems[i]) productToItemMap.set(grocyProducts[i].id, insertedItems[i].id); }
+    const productToIdMap = new Map<number, number>();
+    for (let i = 0; i < grocyProducts.length; i++) { if (insertedProducts[i]) productToIdMap.set(grocyProducts[i].id, insertedProducts[i].id); }
 
-    if (grocyStockLog.length > 0) { const m = mapStockLog(grocyStockLog, productToItemMap, options.familyId, defaultUserId, unitMap, shopMap); report.warnings.push(...m.warnings); if (m.items.length > 0) { await db.insert(schema.invStockTransactions).values(m.items); report.summary.stockTransactions = m.items.length; console.log(`  ✓ 流水: ${m.items.length}`); } }
+    if (grocyStockLog.length > 0) { const m = mapStockLog(grocyStockLog, productToIdMap, options.familyId, defaultUserId, unitMap, shopMap); report.warnings.push(...m.warnings); if (m.items.length > 0) { await db.insert(schema.invStockLog).values(m.items); report.summary.stockTransactions = m.items.length; console.log(`  ✓ 流水: ${m.items.length}`); } }
 
     if (grocyShoppingListItems.length > 0) {
       const { list, items: listItems, warnings } = mapShoppingList(grocyShoppingListItems, productGrocyNameMap, options.familyId, defaultUserId, unitMap);

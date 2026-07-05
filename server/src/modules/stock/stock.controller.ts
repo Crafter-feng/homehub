@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Put, Delete, Body, Param, Query, Request, UseGuards, Res } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { StockService } from './stock.service';
-import { CreateItemDto, UpdateItemDto, ConsumeItemDto, TransferItemDto, AdjustItemDto, StockInItemDto, CreateBatchDto, UpdateBatchDto } from './dto/stock.dto';
+import { CreateProductDto, UpdateProductDto, StockInDto, ConsumeDto, TransferDto, AdjustDto, UpdateBatchDto } from './dto/stock.dto';
 import { PaginationQuery } from '../../common';
 import { Response } from 'express';
 import * as QRCode from 'qrcode';
@@ -15,176 +15,124 @@ interface AuthedRequest {
 export class StockController {
   constructor(private readonly stockService: StockService) {}
 
-  @Get('items')
-  hhListItems(
+  // ── 产品 CRUD ──
+
+  @Get('products')
+  listProducts(
     @Request() req: AuthedRequest,
     @Query('category') category?: string,
     @Query('location') location?: string,
     @Query('expiring') expiring?: string,
     @Query() pagination?: PaginationQuery,
   ) {
-    return this.stockService.list(req.user.familyId, {
+    return this.stockService.listProducts(req.user.familyId, {
       category,
       location,
       expiring: expiring ? parseInt(expiring) : undefined,
     }, pagination);
   }
 
-  @Get('items/search')
-  searchItems(
+  @Get('products/search')
+  searchProducts(
     @Request() req: AuthedRequest,
     @Query('q') query: string,
     @Query() pagination?: PaginationQuery,
   ) {
-    return this.stockService.search(req.user.familyId, query, pagination);
+    return this.stockService.searchProducts(req.user.familyId, query, pagination);
   }
 
-  @Get('items/:id')
-  getItem(@Param('id') id: string, @Request() req: AuthedRequest) {
-    return this.stockService.getById(parseInt(id), req.user.familyId);
+  @Get('products/:id')
+  getProduct(@Param('id') id: string, @Request() req: AuthedRequest) {
+    return this.stockService.getProductById(parseInt(id), req.user.familyId);
   }
 
-  @Post('items')
-  createItem(@Request() req: AuthedRequest, @Body() dto: CreateItemDto) {
-    return this.stockService.create(req.user.familyId, dto, req.user.id);
+  @Post('products')
+  createProduct(@Request() req: AuthedRequest, @Body() dto: CreateProductDto) {
+    return this.stockService.createProduct(req.user.familyId, dto);
   }
 
-  @Put('items/:id')
-  updateItem(@Param('id') id: string, @Request() req: AuthedRequest, @Body() dto: UpdateItemDto) {
-    return this.stockService.update(parseInt(id), req.user.familyId, dto);
+  @Put('products/:id')
+  updateProduct(@Param('id') id: string, @Request() req: AuthedRequest, @Body() dto: UpdateProductDto) {
+    return this.stockService.updateProduct(parseInt(id), req.user.familyId, dto);
   }
 
-  @Delete('items/:id')
-  deleteItem(@Param('id') id: string, @Request() req: AuthedRequest) {
-    return this.stockService.delete(parseInt(id), req.user.familyId);
+  @Delete('products/:id')
+  deleteProduct(@Param('id') id: string, @Request() req: AuthedRequest) {
+    return this.stockService.deleteProduct(parseInt(id), req.user.familyId);
   }
 
-  @Post('items/:id/consume')
-  consumeItem(@Param('id') id: string, @Request() req: AuthedRequest, @Body() dto: ConsumeItemDto) {
-    return this.stockService.consume(parseInt(id), req.user.familyId, req.user.id, dto);
+  @Post('products/:id/merge/:removeId')
+  mergeProducts(@Param('id') id: string, @Param('removeId') removeId: string, @Request() req: AuthedRequest) {
+    return this.stockService.mergeProducts(parseInt(id), parseInt(removeId), req.user.familyId);
   }
 
-  @Post('items/:id/stock-in')
-  stockInItem(@Param('id') id: string, @Request() req: AuthedRequest, @Body() dto: StockInItemDto) {
+  // ── 库存操作 ──
+
+  @Post('products/:id/stock-in')
+  stockIn(@Param('id') id: string, @Request() req: AuthedRequest, @Body() dto: StockInDto) {
     return this.stockService.stockIn(parseInt(id), req.user.familyId, req.user.id, dto);
   }
 
-  @Post('items/:id/transfer')
-  transferItem(@Param('id') id: string, @Request() req: AuthedRequest, @Body() dto: TransferItemDto) {
+  @Post('products/:id/consume')
+  consume(@Param('id') id: string, @Request() req: AuthedRequest, @Body() dto: ConsumeDto) {
+    return this.stockService.consume(parseInt(id), req.user.familyId, req.user.id, dto);
+  }
+
+  @Post('products/:id/transfer')
+  transfer(@Param('id') id: string, @Request() req: AuthedRequest, @Body() dto: TransferDto) {
     return this.stockService.transfer(parseInt(id), req.user.familyId, req.user.id, dto);
   }
 
-  @Post('items/:id/adjust')
-  adjustItem(@Param('id') id: string, @Request() req: AuthedRequest, @Body() dto: AdjustItemDto) {
+  @Post('products/:id/adjust')
+  adjust(@Param('id') id: string, @Request() req: AuthedRequest, @Body() dto: AdjustDto) {
     return this.stockService.adjust(parseInt(id), req.user.familyId, req.user.id, dto);
   }
 
-  @Get('items/:id/history')
-  getItemHistory(@Param('id') id: string, @Request() req: AuthedRequest) {
-    return this.stockService.getHistory(parseInt(id), req.user.familyId);
+  @Post('products/:id/open')
+  openProduct(@Param('id') id: string, @Request() req: AuthedRequest) {
+    return this.stockService.openProduct(parseInt(id), req.user.familyId, req.user.id);
   }
 
-  @Get('items/:id/price-history')
+  // ── 批次管理 ──
+
+  @Get('products/:id/batches')
+  listBatches(@Param('id') id: string, @Request() req: AuthedRequest) {
+    return this.stockService.listBatches(parseInt(id), req.user.familyId);
+  }
+
+  @Get('products/:id/batches/summary')
+  getBatchSummary(@Param('id') id: string, @Request() req: AuthedRequest) {
+    return this.stockService.getBatchSummary(parseInt(id), req.user.familyId);
+  }
+
+  @Put('products/batches/:batchId')
+  updateBatch(@Param('batchId') batchId: string, @Request() req: AuthedRequest, @Body() dto: UpdateBatchDto) {
+    return this.stockService.updateBatch(parseInt(batchId), req.user.familyId, dto);
+  }
+
+  @Delete('products/batches/:batchId')
+  deleteBatch(@Param('batchId') batchId: string, @Request() req: AuthedRequest) {
+    return this.stockService.deleteBatch(parseInt(batchId), req.user.familyId);
+  }
+
+  // ── 分析 ──
+
+  @Get('products/:id/price-history')
   getPriceHistory(@Param('id') id: string, @Request() req: AuthedRequest) {
     return this.stockService.getPriceHistory(parseInt(id), req.user.familyId);
   }
 
-  @Get('items/:id/qrcode')
+  @Get('products/:id/qrcode')
   async getQRCode(@Param('id') id: string, @Request() req: AuthedRequest, @Res() res: Response) {
-    const item = await this.stockService.getById(parseInt(id), req.user.familyId);
-    const payload = JSON.stringify({ type: 'homehub-item', id: item.id, name: item.name, barcode: item.barcode });
+    const product = await this.stockService.getProductById(parseInt(id), req.user.familyId);
+    const payload = JSON.stringify({ type: 'homehub-product', id: product.id, name: product.name, barcode: product.barcode });
     const buffer = await QRCode.toBuffer(payload, { type: 'png', width: 300, margin: 2 });
-    res.set({ 'Content-Type': 'image/png', 'Content-Disposition': `inline; filename="item-${item.id}-qr.png"` });
+    res.set({ 'Content-Type': 'image/png', 'Content-Disposition': `inline; filename="product-${product.id}-qr.png"` });
     res.send(buffer);
-  }
-
-  @Get('expiring')
-  getExpiring(@Request() req: AuthedRequest, @Query('days') days?: string) {
-    return this.stockService.getExpiring(req.user.familyId, days ? parseInt(days) : 7);
   }
 
   @Get('summary')
   getSummary(@Request() req: AuthedRequest) {
     return this.stockService.getSummary(req.user.familyId);
-  }
-
-  @Post('items/:id/batches')
-  createBatch(@Param('id') id: string, @Request() req: AuthedRequest, @Body() dto: CreateBatchDto) {
-    return this.stockService.createBatch(parseInt(id), req.user.familyId, dto);
-  }
-
-  @Get('items/:id/batches')
-  listBatches(@Param('id') id: string, @Request() req: AuthedRequest) {
-    return this.stockService.listBatches(parseInt(id), req.user.familyId);
-  }
-
-  @Get('items/:id/batches/summary')
-  getBatchSummary(@Param('id') id: string, @Request() req: AuthedRequest) {
-    return this.stockService.getBatchSummary(parseInt(id), req.user.familyId);
-  }
-
-  @Put('items/batches/:batchId')
-  updateBatch(
-    @Param('batchId') batchId: string,
-    @Request() req: AuthedRequest,
-    @Body() dto: UpdateBatchDto,
-  ) {
-    return this.stockService.editBatch(parseInt(batchId), req.user.familyId, dto);
-  }
-
-  @Delete('items/batches/:batchId')
-  deleteBatch(
-    @Param('batchId') batchId: string,
-    @Request() req: AuthedRequest,
-  ) {
-    return this.stockService.deleteBatch(parseInt(batchId), req.user.familyId);
-  }
-
-  @Post('items/:id/batches/compact')
-  compactBatches(@Param('id') id: string, @Request() req: AuthedRequest) {
-    return this.stockService.compactBatches(parseInt(id), req.user.familyId);
-  }
-
-  @Get('export')
-  async exportCsv(@Request() req: AuthedRequest, @Res() res: Response) {
-    // list now returns PaginationResponse, extract data array for CSV export
-    const result = await this.stockService.list(req.user.familyId);
-    const itemsList = result.data;
-    const csv = [
-      'name,type,quantity,unit,locationId,expiryDate,brand,notes',
-      ...itemsList.map((i) => [
-        `"${(i.name || '').replace(/"/g, '""')}"`,
-        i.type || '',
-        i.quantity,
-        i.unit || '',
-        i.locationId || '',
-        i.expiryDate ? new Date(i.expiryDate).toISOString().split('T')[0] : '',
-        `"${(i.brand || '').replace(/"/g, '""')}"`,
-        `"${(i.notes || '').replace(/"/g, '""')}"`,
-      ].join(','))
-    ].join('\n');
-
-    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', 'attachment; filename=homehub-stock.csv');
-    res.send('\ufeff' + csv);
-  }
-
-  @Post('import')
-  async importCsv(@Request() req: AuthedRequest, @Body() body: { invItems: Array<Partial<CreateItemDto>> }) {
-    const results = [];
-    for (const item of (body.invItems || [])) {
-      try {
-        const created = await this.stockService.create(req.user.familyId, item as CreateItemDto, req.user.id);
-        results.push({ success: true, item: created });
-      } catch (e: unknown) {
-        const err = e as { message?: string };
-        results.push({ success: false, error: err.message || 'Unknown error', item });
-      }
-    }
-    return {
-      imported: results.filter(r => r.success).length,
-      failed: results.filter(r => !r.success).length,
-      results,
-    };
   }
 }

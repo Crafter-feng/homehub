@@ -66,7 +66,7 @@ export class AddListItemDto {
 
   @IsNumber()
   @IsOptional()
-  linkedItemId?: number;
+  linkedProductId?: number;
 
   @IsNumber()
   @IsOptional()

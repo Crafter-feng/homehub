@@ -1,5 +1,5 @@
 -- ═══════════════════════════════════════════════════════
--- HomeHub 完整 Schema (合并自 0000-0017)
+-- HomeHub 完整 Schema（库存管理重设计版）
 -- ═══════════════════════════════════════════════════════
 
 -- ── 认证 ──
@@ -149,22 +149,26 @@ CREATE TABLE IF NOT EXISTS `md_item_tags` (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS `md_item_tags_item_tag_unique` ON `md_item_tags` (`item_id`,`tag_id`);
 
--- ── 库存 ──
+-- ── 库存：产品 ──
 CREATE TABLE IF NOT EXISTS `inv_products` (
   `id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
   `family_id` integer NOT NULL,
   `name` text NOT NULL,
   `barcode` text,
-  `category_id` integer,
+  `category_id` integer REFERENCES `md_categories`(`id`),
   `unit` text DEFAULT '个' NOT NULL,
   `brand` text,
   `image` text,
+  `location_id` integer REFERENCES `md_locations`(`id`),
+  `min_stock` real DEFAULT 0,
+  `shop` text,
   `default_price` real,
   `default_best_before_days` integer,
   `default_best_before_days_after_open` integer,
   `move_on_open_location_id` integer,
   `parent_id` integer,
   `calories_per_unit` real,
+  `tare_weight` real,
   `purchase_unit` text,
   `stock_unit` text,
   `consume_unit` text,
@@ -181,112 +185,67 @@ CREATE TABLE IF NOT EXISTS `inv_products` (
 CREATE INDEX IF NOT EXISTS `idx_inv_products_family` ON `inv_products`(`family_id`);
 CREATE INDEX IF NOT EXISTS `idx_inv_products_barcode` ON `inv_products`(`barcode`);
 
-CREATE TABLE IF NOT EXISTS `inv_product_barcodes` (
+-- ── 库存：批次 ──
+CREATE TABLE IF NOT EXISTS `inv_batches` (
   `id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
-  `product_id` integer NOT NULL,
-  `barcode` text NOT NULL,
-  `is_primary` integer DEFAULT 0,
-  `notes` text,
-  `created_at` integer NOT NULL,
-  FOREIGN KEY (`product_id`) REFERENCES `inv_products`(`id`) ON DELETE cascade
-);
-
-CREATE TABLE IF NOT EXISTS `inv_items` (
-  `id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
-  `family_id` integer NOT NULL,
-  `product_id` integer,
-  `name` text NOT NULL,
-  `type` text DEFAULT 'generic' NOT NULL,
-  `barcode` text,
-  `category_id` integer,
-  `location_id` integer,
-  `quantity` real DEFAULT 1 NOT NULL,
-  `unit` text DEFAULT '个' NOT NULL,
-  `min_stock` real DEFAULT 0,
-  `brand` text,
-  `shop` text,
-  `notes` text,
-  `image` text,
-  `custom_fields` text,
-  `current_state` text,
-  `state_changed_at` integer,
-  `cycle_count` integer DEFAULT 0,
-  `purchase_price` real,
-  `currency` text DEFAULT 'CNY',
-  `last_price` real,
-  `avg_price` real,
-  `min_price` real,
-  `max_price` real,
-  `purchase_date` integer,
-  `expiry_date` integer,
-  `last_used_at` integer,
-  `spoil_rate` real,
-  `avg_shelf_life` real,
-  `tare_weight` real,
-  `calories_per_unit` real,
-  `created_at` integer NOT NULL,
-  `updated_at` integer NOT NULL,
-  FOREIGN KEY (`family_id`) REFERENCES `families`(`id`),
-  FOREIGN KEY (`product_id`) REFERENCES `inv_products`(`id`),
-  FOREIGN KEY (`category_id`) REFERENCES `md_categories`(`id`),
-  FOREIGN KEY (`location_id`) REFERENCES `md_locations`(`id`)
-);
-CREATE INDEX IF NOT EXISTS `idx_inv_items_family_id` ON `inv_items`(`family_id`);
-CREATE INDEX IF NOT EXISTS `idx_inv_items_location` ON `inv_items`(`location_id`);
-CREATE INDEX IF NOT EXISTS `idx_inv_items_expiry` ON `inv_items`(`expiry_date`);
-CREATE INDEX IF NOT EXISTS `idx_inv_items_type` ON `inv_items`(`family_id`, `type`);
-
-CREATE TABLE IF NOT EXISTS `inv_item_batches` (
-  `id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
-  `item_id` integer NOT NULL,
+  `product_id` integer NOT NULL REFERENCES `inv_products`(`id`) ON DELETE CASCADE,
   `batch_number` text,
   `quantity` real NOT NULL,
   `unit` text NOT NULL,
   `purchase_date` integer,
   `expiry_date` integer,
-  `location_id` integer,
-  `created_at` integer NOT NULL,
-  FOREIGN KEY (`item_id`) REFERENCES `inv_items`(`id`) ON DELETE cascade,
-  FOREIGN KEY (`location_id`) REFERENCES `md_locations`(`id`)
+  `location_id` integer REFERENCES `md_locations`(`id`),
+  `shop` text,
+  `price` real,
+  `open` integer DEFAULT 0,
+  `opened_date` integer,
+  `created_at` integer NOT NULL
 );
+CREATE INDEX IF NOT EXISTS `idx_inv_batches_product` ON `inv_batches`(`product_id`);
 
-CREATE TABLE IF NOT EXISTS `inv_stock_transactions` (
+-- ── 库存：流水 ──
+CREATE TABLE IF NOT EXISTS `inv_stock_log` (
   `id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
-  `item_id` integer NOT NULL,
-  `batch_id` integer,
+  `product_id` integer NOT NULL REFERENCES `inv_products`(`id`),
+  `batch_id` integer REFERENCES `inv_batches`(`id`),
   `recipe_id` integer,
   `type` text NOT NULL,
   `quantity` real NOT NULL,
   `unit` text NOT NULL,
   `spoiled` real DEFAULT 0,
-  `from_location_id` integer,
-  `to_location_id` integer,
+  `from_location_id` integer REFERENCES `md_locations`(`id`),
+  `to_location_id` integer REFERENCES `md_locations`(`id`),
   `user_id` integer NOT NULL,
   `source` text DEFAULT 'manual' NOT NULL,
   `note` text,
   `price` real,
   `shop` text,
-  `spec` text,
-  `created_at` integer NOT NULL,
-  FOREIGN KEY (`item_id`) REFERENCES `inv_items`(`id`),
-  FOREIGN KEY (`batch_id`) REFERENCES `inv_item_batches`(`id`),
-  FOREIGN KEY (`from_location_id`) REFERENCES `md_locations`(`id`),
-  FOREIGN KEY (`to_location_id`) REFERENCES `md_locations`(`id`)
+  `created_at` integer NOT NULL
 );
-CREATE INDEX IF NOT EXISTS `idx_inv_stock_tx_item` ON `inv_stock_transactions`(`item_id`);
+CREATE INDEX IF NOT EXISTS `idx_inv_stock_log_product` ON `inv_stock_log`(`product_id`);
 
+-- ── 产品条码 ──
+CREATE TABLE IF NOT EXISTS `inv_product_barcodes` (
+  `id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+  `product_id` integer NOT NULL REFERENCES `inv_products`(`id`) ON DELETE CASCADE,
+  `barcode` text NOT NULL,
+  `is_primary` integer DEFAULT 0,
+  `notes` text,
+  `created_at` integer NOT NULL
+);
+
+-- ── 产品文档 ──
 CREATE TABLE IF NOT EXISTS `inv_documents` (
   `id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
   `family_id` integer NOT NULL,
-  `item_id` integer,
+  `product_id` integer REFERENCES `inv_products`(`id`) ON DELETE SET NULL,
   `name` text NOT NULL,
   `file_path` text NOT NULL,
   `mime_type` text NOT NULL,
   `file_size` integer NOT NULL,
   `category` text DEFAULT 'other' NOT NULL,
   `created_at` integer NOT NULL,
-  FOREIGN KEY (`family_id`) REFERENCES `families`(`id`),
-  FOREIGN KEY (`item_id`) REFERENCES `inv_items`(`id`) ON DELETE set null
+  FOREIGN KEY (`family_id`) REFERENCES `families`(`id`)
 );
 
 -- ── 清单 ──
@@ -318,7 +277,7 @@ CREATE TABLE IF NOT EXISTS `hh_list_items` (
   `assignee_id` integer,
   `quantity` real,
   `unit` text,
-  `linked_item_id` integer,
+  `linked_product_id` integer,
   `linked_recipe_id` integer,
   `due_at` integer,
   `last_reset_at` integer,
@@ -327,11 +286,9 @@ CREATE TABLE IF NOT EXISTS `hh_list_items` (
   FOREIGN KEY (`list_id`) REFERENCES `hh_lists`(`id`) ON DELETE cascade,
   FOREIGN KEY (`completed_by`) REFERENCES `users`(`id`),
   FOREIGN KEY (`assignee_id`) REFERENCES `users`(`id`),
-  FOREIGN KEY (`linked_item_id`) REFERENCES `inv_items`(`id`)
+  FOREIGN KEY (`linked_product_id`) REFERENCES `inv_products`(`id`)
 );
 CREATE INDEX IF NOT EXISTS `idx_hh_list_items_list_status` ON `hh_list_items`(`list_id`, `status`);
-CREATE INDEX IF NOT EXISTS `idx_hh_list_items_assignee` ON `hh_list_items`(`assignee_id`);
-CREATE INDEX IF NOT EXISTS `idx_hh_list_items_linked` ON `hh_list_items`(`linked_item_id`);
 
 CREATE TABLE IF NOT EXISTS `hh_list_item_comments` (
   `id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
@@ -459,7 +416,7 @@ CREATE TABLE IF NOT EXISTS `hh_holiday_templates` (
   `id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
   `name` text NOT NULL,
   `type` text NOT NULL,
-  `invItems` text,
+  `invProducts` text,
   `is_preset` integer DEFAULT false NOT NULL,
   `created_at` integer NOT NULL
 );

@@ -208,15 +208,15 @@ export class McpService {
     familyId: number,
     userId: number,
   ): Promise<any> {
-    // GET /v1/stock/invItems → search_items
-    if (resolvedPath === '/v1/stock/invItems' && method === 'GET') {
+    // GET /v1/stock/products → search_items
+    if (resolvedPath === '/v1/stock/products' && method === 'GET') {
       if (params.query) {
-        return this.stockService.search(familyId, params.query, {
+        return this.stockService.searchProducts(familyId, params.query, {
           page: 1,
           limit: params.limit || 20,
         });
       }
-      return this.stockService.list(familyId, {
+      return this.stockService.listProducts(familyId, {
         category: params.category,
         location: params.location,
         expiring: params.expiring_in_days,
@@ -226,48 +226,43 @@ export class McpService {
       });
     }
 
-    // POST /v1/stock/invItems → add_item
-    if (resolvedPath === '/v1/stock/invItems' && method === 'POST') {
-      return this.stockService.create(familyId, {
+    // POST /v1/stock/products → add_item
+    if (resolvedPath === '/v1/stock/products' && method === 'POST') {
+      return this.stockService.createProduct(familyId, {
         name: params.name,
-        type: params.type || 'generic',
         barcode: params.barcode,
         locationId: params.location_id ? parseInt(params.location_id, 10) : undefined,
-        quantity: params.quantity ?? 1,
         unit: params.unit || '个',
-        notes: params.notes,
-        expiryDate: params.expiry_date,
-      }, userId);
-    }
-
-    // GET /v1/stock/invItems/{id} → get_item
-    const getItemMatch = resolvedPath.match(/^\/v1\/stock\/invItems\/(\d+)$/);
-    if (getItemMatch && method === 'GET') {
-      const itemId = parseInt(getItemMatch[1], 10);
-      return this.stockService.getById(itemId, familyId);
-    }
-
-    // PUT /v1/stock/invItems/{id} → update_item
-    const updateMatch = resolvedPath.match(/^\/v1\/stock\/invItems\/(\d+)$/);
-    if (updateMatch && method === 'PUT') {
-      const itemId = parseInt(updateMatch[1], 10);
-      return this.stockService.update(itemId, familyId, {
-        name: params.name,
-        quantity: params.quantity,
-        expiryDate: params.expiry_date,
         notes: params.notes,
       });
     }
 
-    // DELETE /v1/stock/invItems/{id} → delete_item
-    const deleteMatch = resolvedPath.match(/^\/v1\/stock\/invItems\/(\d+)$/);
-    if (deleteMatch && method === 'DELETE') {
-      const itemId = parseInt(deleteMatch[1], 10);
-      return this.stockService.delete(itemId, familyId);
+    // GET /v1/stock/products/{id} → get_item
+    const getItemMatch = resolvedPath.match(/^\/v1\/stock\/products\/(\d+)$/);
+    if (getItemMatch && method === 'GET') {
+      const itemId = parseInt(getItemMatch[1], 10);
+      return this.stockService.getProductById(itemId, familyId);
     }
 
-    // POST /v1/stock/invItems/{id}/consume → consume_item
-    const consumeMatch = resolvedPath.match(/^\/v1\/stock\/invItems\/(\d+)\/consume$/);
+    // PUT /v1/stock/products/{id} → update_item
+    const updateMatch = resolvedPath.match(/^\/v1\/stock\/products\/(\d+)$/);
+    if (updateMatch && method === 'PUT') {
+      const itemId = parseInt(updateMatch[1], 10);
+      return this.stockService.updateProduct(itemId, familyId, {
+        name: params.name,
+        notes: params.notes,
+      });
+    }
+
+    // DELETE /v1/stock/products/{id} → delete_item
+    const deleteMatch = resolvedPath.match(/^\/v1\/stock\/products\/(\d+)$/);
+    if (deleteMatch && method === 'DELETE') {
+      const itemId = parseInt(deleteMatch[1], 10);
+      return this.stockService.deleteProduct(itemId, familyId);
+    }
+
+    // POST /v1/stock/products/{id}/consume → consume_item
+    const consumeMatch = resolvedPath.match(/^\/v1\/stock\/products\/(\d+)\/consume$/);
     if (consumeMatch && method === 'POST') {
       const itemId = parseInt(consumeMatch[1], 10);
       return this.stockService.consume(itemId, familyId, userId, {
@@ -276,8 +271,8 @@ export class McpService {
       });
     }
 
-    // POST /v1/stock/invItems/{id}/adjust → adjust_item
-    const adjustMatch = resolvedPath.match(/^\/v1\/stock\/invItems\/(\d+)\/adjust$/);
+    // POST /v1/stock/products/{id}/adjust → adjust_item
+    const adjustMatch = resolvedPath.match(/^\/v1\/stock\/products\/(\d+)\/adjust$/);
     if (adjustMatch && method === 'POST') {
       const itemId = parseInt(adjustMatch[1], 10);
       return this.stockService.adjust(itemId, familyId, userId, {
@@ -286,8 +281,8 @@ export class McpService {
       });
     }
 
-    // POST /v1/stock/invItems/{id}/transfer → move_item
-    const transferMatch = resolvedPath.match(/^\/v1\/stock\/invItems\/(\d+)\/transfer$/);
+    // POST /v1/stock/products/{id}/transfer → move_item
+    const transferMatch = resolvedPath.match(/^\/v1\/stock\/products\/(\d+)\/transfer$/);
     if (transferMatch && method === 'POST') {
       const itemId = parseInt(transferMatch[1], 10);
       const toLocationId = parseInt(params.to_location_id, 10);
@@ -299,11 +294,11 @@ export class McpService {
       });
     }
 
-    // GET /v1/stock/invItems/{id}/history → get_item_history
-    const historyMatch = resolvedPath.match(/^\/v1\/stock\/invItems\/(\d+)\/history$/);
+    // GET /v1/stock/products/{id}/history → get_item_history
+    const historyMatch = resolvedPath.match(/^\/v1\/stock\/products\/(\d+)\/history$/);
     if (historyMatch && method === 'GET') {
       const itemId = parseInt(historyMatch[1], 10);
-      return this.stockService.getHistory(itemId, familyId);
+      return this.stockService.getBatchSummary(itemId, familyId);
     }
 
     // GET /v1/stock/summary → get_stock_summary
@@ -313,7 +308,7 @@ export class McpService {
 
     // GET /v1/stock/expiring → get_expiring_items
     if (resolvedPath === '/v1/stock/expiring' && method === 'GET') {
-      return this.stockService.getExpiring(familyId, params.days || 7);
+      return this.stockService.getSummary(familyId);
     }
 
     throw new Error(`未知的 Stock API 路径: ${resolvedPath} (${method})`);
@@ -745,7 +740,7 @@ export class McpService {
   ): Promise<any> {
     // GET /v1/dashboard/summary → get_dashboard_summary
     if (resolvedPath === '/v1/dashboard/summary' && method === 'GET') {
-      return this.dashboardService.getStockSummary(familyId);
+      return this.dashboardService.getSummary(familyId);
     }
 
     // GET /v1/dashboard/waste-analysis → get_waste_analysis

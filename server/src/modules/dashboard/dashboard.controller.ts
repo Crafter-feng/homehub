@@ -20,7 +20,7 @@ export class DashboardController {
 
   @Get('summary')
   getSummary(@Request() req: any) {
-    return this.dashboardService.getStockSummary(req.user.familyId);
+    return this.dashboardService.getSummary(req.user.familyId);
   }
 
   @Get('waste-analysis')
@@ -29,12 +29,8 @@ export class DashboardController {
   }
 
   @Get('spending-report')
-  getSpendingReport(
-    @Request() req: any,
-    @Query('startDate') startDate?: string,
-    @Query('endDate') endDate?: string,
-  ) {
-    return this.dashboardService.getSpendingReport(req.user.familyId, startDate, endDate);
+  getSpendingReport(@Request() req: any) {
+    return this.dashboardService.getSpendingReport(req.user.familyId);
   }
 
   @Get('location-report')
