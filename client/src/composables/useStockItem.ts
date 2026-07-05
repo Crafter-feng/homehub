@@ -22,11 +22,13 @@ export function useStockItem(options?: { onUpdated?: () => void; onDeleted?: () 
   // Form state
   const consumeQuantity = ref(1);
   const consumeNote = ref('');
+  const consumeSpoiled = ref(false);
   const stockInQuantity = ref(1);
   const stockInPrice = ref<number | null>(null);
   const stockInShop = ref('');
   const stockInNote = ref('');
   const transferLocation = ref<number | null>(null);
+  const transferQuantity = ref<number | null>(null);
 
   // Computed
   const locationSelectOptions = computed(() =>
@@ -94,6 +96,19 @@ export function useStockItem(options?: { onUpdated?: () => void; onDeleted?: () 
     showStockInModal.value = true;
   };
 
+  const openTransfer = () => {
+    transferLocation.value = null;
+    transferQuantity.value = null;
+    showTransferModal.value = true;
+  };
+
+  const openConsume = () => {
+    consumeQuantity.value = 1;
+    consumeNote.value = '';
+    consumeSpoiled.value = false;
+    showConsumeModal.value = true;
+  };
+
   const handleStockIn = async () => {
     if (!item.value) return;
     try {
@@ -116,7 +131,7 @@ export function useStockItem(options?: { onUpdated?: () => void; onDeleted?: () 
   const handleConsume = async () => {
     if (!item.value) return;
     try {
-      await stockApi.consume(item.value.id, { quantity: consumeQuantity.value, note: consumeNote.value });
+      await stockApi.consume(item.value.id, { quantity: consumeQuantity.value, note: consumeNote.value, spoiled: consumeSpoiled.value ? 1 : undefined });
       message.success(t('stock.consumeSuccess'));
       showConsumeModal.value = false;
       loadData(item.value.id);
@@ -134,7 +149,8 @@ export function useStockItem(options?: { onUpdated?: () => void; onDeleted?: () 
       return;
     }
     try {
-      await stockApi.transfer(item.value.id, { toLocationId: transferLocation.value });
+      const qty = transferQuantity.value ?? item.value.quantity;
+      await stockApi.transfer(item.value.id, { toLocationId: transferLocation.value, quantity: qty });
       message.success(t('stock.transferSuccess'));
       showTransferModal.value = false;
       loadData(item.value.id);
@@ -174,11 +190,13 @@ export function useStockItem(options?: { onUpdated?: () => void; onDeleted?: () 
     showStockInModal,
     consumeQuantity,
     consumeNote,
+    consumeSpoiled,
     stockInQuantity,
     stockInPrice,
     stockInShop,
     stockInNote,
     transferLocation,
+    transferQuantity,
     locationSelectOptions,
     isExpired,
     isExpiringSoon,
@@ -188,6 +206,8 @@ export function useStockItem(options?: { onUpdated?: () => void; onDeleted?: () 
     formatDateTime,
     loadData,
     openStockIn,
+    openTransfer,
+    openConsume,
     handleStockIn,
     handleConsume,
     handleTransfer,

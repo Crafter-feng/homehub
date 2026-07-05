@@ -96,8 +96,8 @@
         <!-- 操作按钮 -->
         <div class="detail-actions">
           <n-button type="success" size="small" @click="openStockIn">{{ t('stock.stockIn') }}</n-button>
-          <n-button type="primary" size="small" @click="showConsumeModal = true">{{ t('stock.consume') }}</n-button>
-          <n-button size="small" @click="showTransferModal = true">{{ t('stock.transfer') }}</n-button>
+          <n-button type="primary" size="small" @click="openConsume">{{ t('stock.consume') }}</n-button>
+          <n-button size="small" @click="openTransfer">{{ t('stock.transfer') }}</n-button>
           <n-button type="error" size="small" ghost @click="handleDelete(item.id, item.name)">{{ t('common.delete') }}</n-button>
 
           <!-- Plugin slot: ItemType-specific action buttons -->
@@ -160,6 +160,11 @@
     <n-modal v-model:show="showTransferModal" :title="t('stock.transferItem')" preset="card" style="max-width: 400px">
       <n-form-item :label="t('stock.toLocation')">
         <n-select v-model:value="transferLocation" :options="locationSelectOptions" />
+      </n-form-item>
+      <n-form-item :label="t('stock.quantityLabel')">
+        <n-input-number v-model:value="transferQuantity" :min="0.01" :max="item?.quantity" style="width: 100%">
+          <template #suffix>{{ item?.unit }}</template>
+        </n-input-number>
       </n-form-item>
       <template #footer>
         <n-space justify="end">
@@ -244,10 +249,10 @@ const {
   showConsumeModal, showTransferModal, showStockInModal,
   consumeQuantity, consumeNote,
   stockInQuantity, stockInPrice, stockInShop, stockInNote,
-  transferLocation, locationSelectOptions,
+  transferLocation, transferQuantity, locationSelectOptions,
   isExpired, isExpiringSoon, isLowStock,
   getLocationName, formatDate, formatDateTime,
-  loadData, openStockIn, handleStockIn, handleConsume, handleTransfer, handleDelete,
+  loadData, openStockIn, openTransfer, openConsume, handleStockIn, handleConsume, handleTransfer, handleDelete,
 } = useStockItem({
   onDeleted: () => router.back(),
 });

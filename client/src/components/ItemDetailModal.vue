@@ -146,8 +146,8 @@
     <template #footer>
       <n-space justify="end" :wrap="false">
         <n-button size="small" @click="openStockIn">{{ t('stock.stockIn') }}</n-button>
-        <n-button size="small" @click="showConsumeModal = true">{{ t('stock.consume') }}</n-button>
-        <n-button size="small" @click="showTransferModal = true">{{ t('stock.transfer') }}</n-button>
+        <n-button size="small" @click="openConsume">{{ t('stock.consume') }}</n-button>
+        <n-button size="small" @click="openTransfer">{{ t('stock.transfer') }}</n-button>
         <n-button size="small" type="error" ghost @click="handleDelete(item.id, item.name)">{{ t('common.delete') }}</n-button>
       </n-space>
     </template>
@@ -156,6 +156,9 @@
     <n-modal v-model:show="showConsumeModal" :title="t('stock.consumeItem')" preset="card" style="max-width: 400px">
       <n-form-item :label="t('stock.quantityLabel')">
         <n-input-number v-model:value="consumeQuantity" :min="0.01" :max="item?.quantity" style="width: 100%" />
+      </n-form-item>
+      <n-form-item label="已变质">
+        <n-checkbox v-model:checked="consumeSpoiled">此物品已变质/损坏</n-checkbox>
       </n-form-item>
       <n-form-item :label="t('stock.noteLabel')">
         <n-input v-model:value="consumeNote" :placeholder="t('stock.stockInNotePlaceholder')" />
@@ -168,10 +171,15 @@
       </template>
     </n-modal>
 
-    <!-- 转移 Modal -->
+    <!-- Transfer Modal -->
     <n-modal v-model:show="showTransferModal" :title="t('stock.transferItem')" preset="card" style="max-width: 400px">
       <n-form-item :label="t('stock.toLocation')">
         <n-select v-model:value="transferLocation" :options="locationSelectOptions" />
+      </n-form-item>
+      <n-form-item :label="t('stock.quantityLabel')">
+        <n-input-number v-model:value="transferQuantity" :min="0.01" :max="item?.quantity" style="width: 100%">
+          <template #suffix>{{ item?.unit }}</template>
+        </n-input-number>
       </n-form-item>
       <template #footer>
         <n-space justify="end">
@@ -211,6 +219,13 @@
       </template>
     </n-modal>
 
+    <!-- Batch Edit Dialog -->
+    <BatchEditDialog
+      v-model:show="showBatchEditDialog"
+      :batch="editingBatch"
+      @saved="onBatchSaved"
+    />
+
     <!-- QR Code Modal -->
     <n-modal v-model:show="showQRCode" preset="card" :title="`QR Code - ${item?.name || ''}`" style="max-width: 360px">
       <div class="qrcode-display" v-if="item">
@@ -230,12 +245,13 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
 import {
-  NModal, NSpin, NButton, NSpace, NFormItem, NEmpty, NIcon,
+  NModal, NSpin, NButton, NSpace, NFormItem, NEmpty, NIcon, NCheckbox,
   NInputNumber, NInput, NSelect, NTag, NTabs, NTabPane, useMessage, useDialog,
 } from 'naive-ui';
 import { BarcodeOutline, QRCodeOutline, DownloadOutline } from '@vicons/ionicons5';
 import { stockApi, locationsApi } from '@/api/client';
 import PriceHistoryChart from './PriceHistoryChart.vue';
+import BatchEditDialog from './BatchEditDialog.vue';
 import { getCategoryColor, getHistoryColor } from '@/utils/format';
 import { useStockItem } from '@/composables/useStockItem';
 import { useI18n } from '@/locales';
@@ -258,12 +274,12 @@ const { t } = useI18n();
 const {
   item, history, locations, loading,
   showConsumeModal, showTransferModal, showStockInModal,
-  consumeQuantity, consumeNote,
+  consumeQuantity, consumeNote, consumeSpoiled,
   stockInQuantity, stockInPrice, stockInShop, stockInNote,
-  transferLocation, locationSelectOptions,
+  transferLocation, transferQuantity, locationSelectOptions,
   isExpired, isExpiringSoon, isLowStock,
   getLocationName, formatDate, formatDateTime,
-  loadData, openStockIn, handleStockIn, handleConsume, handleTransfer, handleDelete,
+  loadData, openStockIn, openTransfer, openConsume, handleStockIn, handleConsume, handleTransfer, handleDelete,
 } = useStockItem({
   onUpdated: () => emit('updated'),
   onDeleted: () => { emit('update:show', false); emit('deleted'); },
@@ -272,6 +288,8 @@ const {
 // Batch state
 const batches = ref<any[]>([]);
 const compacting = ref(false);
+const showBatchEditDialog = ref(false);
+const editingBatch = ref<any>(null);
 
 // QR Code state
 const showQRCode = ref(false);
@@ -321,8 +339,14 @@ const handleCompactBatches = async () => {
   }
 };
 
-const editBatch = (_batch: any) => {
-  message.info('批次编辑功能开发中');
+const editBatch = (batch: any) => {
+  editingBatch.value = batch;
+  showBatchEditDialog.value = true;
+};
+
+const onBatchSaved = () => {
+  loadBatches();
+  if (item.value) loadData(item.value.id);
 };
 
 const deleteBatch = async (batch: any) => {
