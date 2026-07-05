@@ -11,15 +11,26 @@
   >
     <n-spin :show="loading">
       <div v-if="item" class="item-detail-content">
-        <!-- 标签行 -->
-        <div class="detail-tags">
-          <n-tag size="small" round :bordered="false" :type="getCategoryColor(item.type)">
-            {{ item.type }}
-          </n-tag>
-          <n-tag v-if="item.spec" size="small" round :bordered="false" type="info">{{ item.spec }}</n-tag>
-          <n-tag v-if="isExpired" size="small" round :bordered="false" type="error">已过期</n-tag>
-          <n-tag v-else-if="isExpiringSoon" size="small" round :bordered="false" type="warning">即将过期</n-tag>
-          <n-tag v-if="isLowStock" size="small" round :bordered="false" type="warning">低库存</n-tag>
+        <!-- 标签行 + 条码 -->
+        <div class="detail-header">
+          <div class="detail-tags">
+            <n-tag size="small" round :bordered="false" :type="getCategoryColor(item.type)">
+              {{ item.type }}
+            </n-tag>
+            <n-tag v-if="item.spec" size="small" round :bordered="false" type="info">{{ item.spec }}</n-tag>
+            <n-tag v-if="isExpired" size="small" round :bordered="false" type="error">{{ t('stock.expired') }}</n-tag>
+            <n-tag v-else-if="isExpiringSoon" size="small" round :bordered="false" type="warning">{{ t('stock.expiringSoon') }}</n-tag>
+            <n-tag v-if="isLowStock" size="small" round :bordered="false" type="warning">{{ t('stock.lowStockLabel') }}</n-tag>
+          </div>
+          <div class="detail-barcode-area" v-if="item.barcode">
+            <n-tag size="small" round :bordered="false" type="default" class="barcode-tag">
+              <template #icon><n-icon :size="12"><BarcodeOutline /></n-icon></template>
+              {{ item.barcode }}
+            </n-tag>
+            <n-button size="tiny" quaternary @click="showQRCode = true">
+              <template #icon><n-icon :size="14"><QRCodeOutline /></n-icon></template>
+            </n-button>
+          </div>
         </div>
 
         <!-- Tabs — 固定高度，内部滚动 -->
@@ -66,11 +77,7 @@
           <div class="detail-section">
             <h3 class="detail-section-title">{{ t('stock.notes') }}</h3>
             <div class="detail-notes">{{ item.notes || '-' }}</div>
-            <div class="detail-field">
-              <span class="detail-field-label">{{ t('stock.barcode') }}</span>
-                  <span class="detail-field-value">{{ item.barcode || '-' }}</span>
-                </div>
-              </div>
+          </div>
             </div>
           </n-tab-pane>
 
@@ -203,15 +210,30 @@
         </n-space>
       </template>
     </n-modal>
+
+    <!-- QR Code Modal -->
+    <n-modal v-model:show="showQRCode" preset="card" :title="`QR Code - ${item?.name || ''}`" style="max-width: 360px">
+      <div class="qrcode-display" v-if="item">
+        <img :src="stockApi.getQRCodeUrl(item.id)" :alt="item.name" class="qrcode-image" />
+        <div class="qrcode-info">
+          <span class="qrcode-label">{{ item.barcode || `#${item.id}` }}</span>
+        </div>
+        <n-button type="primary" block @click="downloadQRCode">
+          <template #icon><n-icon><DownloadOutline /></n-icon></template>
+          {{ t('common.download') || '下载' }}
+        </n-button>
+      </div>
+    </n-modal>
   </n-modal>
 </template>
 
 <script setup lang="ts">
 import { ref, watch } from 'vue';
 import {
-  NModal, NSpin, NButton, NSpace, NFormItem, NEmpty,
+  NModal, NSpin, NButton, NSpace, NFormItem, NEmpty, NIcon,
   NInputNumber, NInput, NSelect, NTag, NTabs, NTabPane, useMessage, useDialog,
 } from 'naive-ui';
+import { BarcodeOutline, QRCodeOutline, DownloadOutline } from '@vicons/ionicons5';
 import { stockApi, locationsApi } from '@/api/client';
 import PriceHistoryChart from './PriceHistoryChart.vue';
 import { getCategoryColor, getHistoryColor } from '@/utils/format';
@@ -250,6 +272,17 @@ const {
 // Batch state
 const batches = ref<any[]>([]);
 const compacting = ref(false);
+
+// QR Code state
+const showQRCode = ref(false);
+
+function downloadQRCode() {
+  if (!item.value) return;
+  const link = document.createElement('a');
+  link.href = stockApi.getQRCodeUrl(item.value.id);
+  link.download = `item-${item.value.id}-qr.png`;
+  link.click();
+}
 
 const translateType = (type: string): string => t(`history.${type}`) || type;
 const translateSource = (source: string): string => t(`history.${source}`) || source;
@@ -329,12 +362,56 @@ watch(() => props.show, (val) => {
   height: 420px;
 }
 
+.detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+  flex-shrink: 0;
+}
+
 .detail-tags {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
-  margin-bottom: 12px;
+  flex: 1;
+}
+
+.detail-barcode-area {
+  display: flex;
+  align-items: center;
+  gap: 4px;
   flex-shrink: 0;
+}
+
+.barcode-tag {
+  font-family: monospace;
+  font-size: 11px;
+}
+
+.qrcode-display {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 0;
+}
+
+.qrcode-image {
+  width: 200px;
+  height: 200px;
+  border: 1px solid var(--hh-border-light);
+  border-radius: 8px;
+}
+
+.qrcode-info {
+  text-align: center;
+}
+
+.qrcode-label {
+  font-family: monospace;
+  font-size: 14px;
+  color: var(--hh-text-secondary);
 }
 
 .detail-tabs {

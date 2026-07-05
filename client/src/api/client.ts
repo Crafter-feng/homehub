@@ -160,6 +160,7 @@ export const stockApi = {
     api.post(`/stock/items/${id}/adjust`, data),
   getHistory: (id: number) => api.get(`/stock/items/${id}/history`),
   getPriceHistory: (id: number) => api.get(`/stock/items/${id}/price-history`),
+  getQRCodeUrl: (id: number) => `/api/v1/stock/items/${id}/qrcode`,
   getExpiring: (days?: number) => api.get('/stock/expiring', { params: { days } }),
   getSummary: () => api.get('/stock/summary'),
   // Batch API

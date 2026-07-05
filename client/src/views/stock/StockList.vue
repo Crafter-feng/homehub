@@ -691,6 +691,12 @@
       @deleted="onItemDeleted"
       @updated="onItemUpdated"
     />
+
+    <ItemEditDialog
+      v-model:show="showItemEditDialog"
+      :item="editingItem"
+      @saved="onItemUpdated"
+    />
   </div>
 </template>
 
@@ -725,6 +731,7 @@ import {
 import { getCategoryColor } from '@/utils/format';
 import ProductFormDialog from '@/components/ProductFormDialog.vue';
 import ItemDetailModal from '@/components/ItemDetailModal.vue';
+import ItemEditDialog from '@/components/ItemEditDialog.vue';
 import { clientRegistry } from '@/plugins/client-registry';
 import type { ScanResult } from '@/plugins/types/client-plugin.types';
 
@@ -898,6 +905,8 @@ function toggleColumn(key: string, visible: boolean) {
 const inlineActionItem = ref<Item | null>(null);
 const showInlineStockInModal = ref(false);
 const showInlineConsumeModal = ref(false);
+const showItemEditDialog = ref(false);
+const editingItem = ref<Item | null>(null);
 const inlineStockInQty = ref(1);
 const inlineStockInPrice = ref<number | null>(null);
 const inlineStockInShop = ref('');
@@ -1508,7 +1517,8 @@ function handleMoreAction(key: string, item: Item) {
       openItemDetail(item.id);
       break;
     case 'edit':
-      openItemDetail(item.id);
+      editingItem.value = item;
+      showItemEditDialog.value = true;
       break;
   }
 }

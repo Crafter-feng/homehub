@@ -4,6 +4,7 @@ import { StockService } from './stock.service';
 import { CreateItemDto, UpdateItemDto, ConsumeItemDto, TransferItemDto, AdjustItemDto, StockInItemDto, CreateBatchDto, UpdateBatchDto } from './dto/stock.dto';
 import { PaginationQuery } from '../../common';
 import { Response } from 'express';
+import * as QRCode from 'qrcode';
 
 interface AuthedRequest {
   user: { id: number; email: string; familyId: number };
@@ -86,6 +87,15 @@ export class StockController {
   @Get('items/:id/price-history')
   getPriceHistory(@Param('id') id: string, @Request() req: AuthedRequest) {
     return this.stockService.getPriceHistory(parseInt(id), req.user.familyId);
+  }
+
+  @Get('items/:id/qrcode')
+  async getQRCode(@Param('id') id: string, @Request() req: AuthedRequest, @Res() res: Response) {
+    const item = await this.stockService.getById(parseInt(id), req.user.familyId);
+    const payload = JSON.stringify({ type: 'homehub-item', id: item.id, name: item.name, barcode: item.barcode });
+    const buffer = await QRCode.toBuffer(payload, { type: 'png', width: 300, margin: 2 });
+    res.set({ 'Content-Type': 'image/png', 'Content-Disposition': `inline; filename="item-${item.id}-qr.png"` });
+    res.send(buffer);
   }
 
   @Get('expiring')

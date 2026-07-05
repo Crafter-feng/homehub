@@ -11,7 +11,7 @@
 
     <n-spin :show="loading">
       <div v-if="item" class="detail-body">
-        <!-- 名称 + 标签行 -->
+        <!-- 名称 + 标签行 + 条码 -->
         <div class="detail-title-row">
           <h1 class="detail-name">{{ item.name }}</h1>
           <div class="detail-tags">
@@ -22,6 +22,15 @@
             <n-tag v-if="isExpired" size="small" round :bordered="false" type="error">{{ t('stock.expired') }}</n-tag>
             <n-tag v-else-if="isExpiringSoon" size="small" round :bordered="false" type="warning">{{ t('stock.expiringSoon') }}</n-tag>
             <n-tag v-if="isLowStock" size="small" round :bordered="false" type="warning">{{ t('stock.lowStockLabel') }}</n-tag>
+          </div>
+          <div class="detail-barcode-area" v-if="item.barcode">
+            <n-tag size="small" round :bordered="false" type="default" class="barcode-tag">
+              <template #icon><n-icon :size="12"><BarcodeOutline /></n-icon></template>
+              {{ item.barcode }}
+            </n-tag>
+            <n-button size="tiny" quaternary @click="showQRCode = true">
+              <template #icon><n-icon :size="14"><QRCodeOutline /></n-icon></template>
+            </n-button>
           </div>
         </div>
 
@@ -80,10 +89,6 @@
             <h3 class="detail-section-title">{{ t('stock.notes') }}</h3>
             <div class="detail-notes">
               {{ item.notes || '-' }}
-            </div>
-            <div class="detail-field">
-              <span class="detail-field-label">{{ t('stock.barcode') }}</span>
-              <span class="detail-field-value">{{ item.barcode || '-' }}</span>
             </div>
           </div>
         </div>
@@ -198,19 +203,34 @@
         </n-space>
       </template>
     </n-modal>
+
+    <!-- QR Code Modal -->
+    <n-modal v-model:show="showQRCode" preset="card" :title="`QR Code - ${item?.name || ''}`" style="max-width: 360px">
+      <div class="qrcode-display" v-if="item">
+        <img :src="stockApi.getQRCodeUrl(item.id)" :alt="item.name" class="qrcode-image" />
+        <div class="qrcode-info">
+          <span class="qrcode-label">{{ item.barcode || `#${item.id}` }}</span>
+        </div>
+        <n-button type="primary" block @click="downloadQRCode">
+          <template #icon><n-icon><DownloadOutline /></n-icon></template>
+          下载二维码
+        </n-button>
+      </div>
+    </n-modal>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import {
-  NButton, NSpace, NSpin, NModal, NFormItem,
-  NInputNumber, NInput, NSelect, NTag, NIcon,
+  NButton, NSpace, NSpin, NModal, NFormItem, NIcon,
+  NInputNumber, NInput, NSelect, NTag,
 } from 'naive-ui';
+import { stockApi, locationsApi } from '@/api/client';
 import PluginSlot from '@/components/PluginSlot.vue';
 import PriceHistoryChart from '@/components/PriceHistoryChart.vue';
-import { ArrowBackOutline } from '@vicons/ionicons5';
+import { ArrowBackOutline, BarcodeOutline, QRCodeOutline, DownloadOutline } from '@vicons/ionicons5';
 import { useI18n } from '@/locales';
 import { useStockItem } from '@/composables/useStockItem';
 import { getCategoryColor, getHistoryColor } from '@/utils/format';
@@ -246,6 +266,17 @@ const shopOptions = computed(() => {
   return [{ label: item.value.shop, value: item.value.shop }];
 });
 
+// QR Code
+const showQRCode = ref(false);
+
+function downloadQRCode() {
+  if (!item.value) return;
+  const link = document.createElement('a');
+  link.href = stockApi.getQRCodeUrl(item.value.id);
+  link.download = `item-${item.value.id}-qr.png`;
+  link.click();
+}
+
 onMounted(() => {
   const id = Number(route.params.id);
   loadData(id);
@@ -276,8 +307,46 @@ onMounted(() => {
 
 .detail-tags {
   display: flex;
-  gap: var(--hh-space-2);
+  gap: 8px;
   flex-wrap: wrap;
+  flex: 1;
+}
+
+.detail-barcode-area {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.barcode-tag {
+  font-family: monospace;
+  font-size: 11px;
+}
+
+.qrcode-display {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 0;
+}
+
+.qrcode-image {
+  width: 200px;
+  height: 200px;
+  border: 1px solid var(--hh-border-light);
+  border-radius: 8px;
+}
+
+.qrcode-info {
+  text-align: center;
+}
+
+.qrcode-label {
+  font-family: monospace;
+  font-size: 14px;
+  color: var(--hh-text-secondary);
 }
 
 /* === Stat Row (3 cards) === */
