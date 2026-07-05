@@ -29,26 +29,26 @@ export class AuthService {
 
     const passwordHash = await bcrypt.hash(dto.password, 10);
 
-    return this.db.transaction(async (tx: any) => {
-      const result = await tx.insert(users).values({
+    // drizzle + better-sqlite3 transactions must be synchronous
+    return this.db.transaction((tx: any) => {
+      const result = tx.insert(users).values({
         name: dto.name,
         email: dto.email,
         passwordHash,
       }).returning().get();
 
       const familyCode = randomBytes(4).toString('hex');
-      const family = await tx.insert(families).values({
+      const family = tx.insert(families).values({
         name: `${dto.name}的家`,
         inviteCode: familyCode,
       }).returning().get();
 
-      await tx.insert(familyMembers).values({
+      tx.insert(familyMembers).values({
         userId: result.id,
         familyId: family.id,
         role: 'admin',
-      });
+      }).run();
 
-      this.logger.log(`用户注册成功: ${dto.email} (ID: ${result.id})`);
       return this.generateTokens(result.id, result.email, family.id);
     });
   }
