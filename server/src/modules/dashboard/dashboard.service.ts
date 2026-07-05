@@ -56,6 +56,12 @@ export class DashboardService {
       .where(eq(invProducts.familyId, familyId))
       .get();
 
+    const totalBatches = await this.db.select({ count: sql<number>`count(*)` })
+      .from(invBatches)
+      .innerJoin(invProducts, eq(invBatches.productId, invProducts.id))
+      .where(eq(invProducts.familyId, familyId))
+      .get();
+
     // 获取所有批次的过期日
     const expiringBatches = await this.db.select({
       productId: invBatches.productId,
@@ -84,6 +90,7 @@ export class DashboardService {
 
     return {
       totalItems: totalItems?.count || 0,
+      totalBatches: totalBatches?.count || 0,
       expiringCount,
       expiredCount: expiredBatches.length,
     };

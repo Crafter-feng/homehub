@@ -564,25 +564,33 @@ export class StockService {
       .where(eq(invProducts.familyId, familyId))
       .get();
 
-    const totalQuantity = await this.db.select({ total: sql<number>`COALESCE(SUM(b.quantity), 0)` })
+    const totalBatches = await this.db.select({ count: sql<number>`count(*)` })
+      .from(invBatches)
+      .innerJoin(invProducts, eq(invBatches.productId, invProducts.id))
+      .where(eq(invProducts.familyId, familyId))
+      .get();
+
+    const totalQuantity = await this.db.select({ total: sql<number>`COALESCE(SUM(${invBatches.quantity}), 0)` })
       .from(invBatches)
       .innerJoin(invProducts, eq(invBatches.productId, invProducts.id))
       .where(eq(invProducts.familyId, familyId))
       .get();
 
     const nowSeconds = Math.floor(Date.now() / 1000);
-    const expiringCount = await this.db.select({ count: sql<number>`count(DISTINCT b.product_id)` })
-      .from(invBatches as any)
-      .innerJoin(invProducts as any, sql`${(invBatches as any).productId} = ${invProducts as any}.id`)
+    const sevenDaysLater = Math.floor(daysFromNow(7) / 1000);
+    const expiringCount = await this.db.select({ count: sql<number>`count(DISTINCT ${invBatches.productId})` })
+      .from(invBatches)
+      .innerJoin(invProducts, eq(invBatches.productId, invProducts.id))
       .where(and(
-        sql`${(invProducts as any).familyId} = ${familyId}`,
-        sql`${(invBatches as any).expiryDate} <= ${Math.floor(daysFromNow(7) / 1000)}`,
-        sql`${(invBatches as any).expiryDate} > ${nowSeconds}`,
+        eq(invProducts.familyId, familyId),
+        sql`${invBatches.expiryDate} <= ${sevenDaysLater}`,
+        sql`${invBatches.expiryDate} > ${nowSeconds}`,
       ))
       .get();
 
     return {
       totalProducts: totalProducts?.count || 0,
+      totalBatches: totalBatches?.count || 0,
       totalQuantity: totalQuantity?.total || 0,
       expiringCount: expiringCount?.count || 0,
     };

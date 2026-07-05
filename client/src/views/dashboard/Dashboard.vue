@@ -16,7 +16,7 @@
           <n-icon :size="18"><CubeOutline /></n-icon>
         </div>
         <div class="mini-stat-info">
-          <span class="mini-stat-value">{{ summary.totalItems }}</span>
+          <span class="mini-stat-value">{{ summary.totalBatches }}</span>
           <span class="mini-stat-label">{{ t('dashboard.totalItems') }}</span>
         </div>
       </div>
@@ -165,6 +165,7 @@ interface ActivityItem {
 
 interface DashboardSummary {
   totalItems: number;
+  totalBatches: number;
   expiringCount: number;
   expiredCount: number;
   monthConsumption: number;
@@ -176,7 +177,7 @@ const authStore = useAuthStore();
 const message = useMessage();
 
 const user = computed(() => authStore.user);
-const summary = ref<DashboardSummary>({ totalItems: 0, expiringCount: 0, expiredCount: 0, monthConsumption: 0, pendingTasks: 0 });
+const summary = ref<DashboardSummary>({ totalItems: 0, totalBatches: 0, expiringCount: 0, expiredCount: 0, monthConsumption: 0, pendingTasks: 0 });
 const activities = ref<ActivityItem[]>([]);
 const loading = ref(true);
 const error = ref(false);
@@ -213,7 +214,7 @@ const loadData = async () => {
       dashboardApi.getSummary(),
       dashboardApi.getActivities(20),
     ]);
-    summary.value = summaryRes.data || { totalItems: 0, expiringCount: 0, expiredCount: 0, monthConsumption: 0, pendingTasks: 0 };
+    summary.value = summaryRes.data || { totalItems: 0, totalBatches: 0, expiringCount: 0, expiredCount: 0, monthConsumption: 0, pendingTasks: 0 };
     activities.value = (activitiesRes.data || []).map((a: any) => ({
       ...a,
       id: String(a.id),

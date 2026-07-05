@@ -132,7 +132,7 @@ export default {
     greetingAfternoon: '下午好',
     greetingEvening: '晚上好',
     greetingNight: '夜深了',
-    totalItems: '物品总数',
+    totalItems: '库存条目',
     expiringSoon: '即将过期',
     pendingTasks: '待办事项',
     monthlyConsumption: '本月消耗',
