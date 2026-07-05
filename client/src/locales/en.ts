@@ -212,6 +212,7 @@ export default {
     purchaseDate: 'Purchase Date',
     minStock: 'Min Stock',
     brand: 'Brand',
+    shop: 'Shop',
     notes: 'Notes',
     consume: 'Consume',
     transfer: 'Transfer',

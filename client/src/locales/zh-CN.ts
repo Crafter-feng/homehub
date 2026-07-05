@@ -212,6 +212,7 @@ export default {
     purchaseDate: '购买日期',
     minStock: '最低库存',
     brand: '品牌',
+    shop: '商店',
     notes: '备注',
     consume: '消耗',
     transfer: '转移',
