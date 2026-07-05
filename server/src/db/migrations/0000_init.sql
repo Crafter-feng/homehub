@@ -220,6 +220,7 @@ CREATE TABLE IF NOT EXISTS `inv_stock_log` (
   `note` text,
   `price` real,
   `shop` text,
+  `spec` text,
   `created_at` integer NOT NULL
 );
 CREATE INDEX IF NOT EXISTS `idx_inv_stock_log_product` ON `inv_stock_log`(`product_id`);

@@ -386,26 +386,34 @@ export class StockService {
         .where(eq(invBatches.productId, productId))
         .get();
 
+      const diff = dto.quantity - totalStock.total;
+
       // 记录流水
       tx.insert(invStockLog).values({
         productId,
         type: 'adjust',
-        quantity: Math.abs(dto.quantity - totalStock.total),
+        quantity: Math.abs(diff),
         unit: product.stockUnit || product.unit,
         userId,
         source: 'manual',
         note: dto.note,
       }).run();
 
-      // 调整：直接修改第一个批次的数量
+      // 调整：修改第一个批次的数量来达到目标总量
       const firstBatch = tx.select().from(invBatches)
         .where(eq(invBatches.productId, productId))
         .orderBy(asc(invBatches.createdAt))
         .get();
 
       if (firstBatch) {
-        tx.update(invBatches).set({ quantity: dto.quantity })
-          .where(eq(invBatches.id, firstBatch.id)).run();
+        const newBatchQty = firstBatch.quantity + diff;
+        if (newBatchQty <= 0) {
+          // 删除批次
+          tx.delete(invBatches).where(eq(invBatches.id, firstBatch.id)).run();
+        } else {
+          tx.update(invBatches).set({ quantity: newBatchQty })
+            .where(eq(invBatches.id, firstBatch.id)).run();
+        }
       }
 
       return tx.select().from(invProducts).where(eq(invProducts.id, productId)).get();
