@@ -28,6 +28,7 @@
     "docker:ps": "docker compose -f docker/docker-compose.yml ps"
   },
   "devDependencies": {
+    "@types/qrcode": "^1.5.6",
     "@vitest/coverage-v8": "^3.2.6",
     "concurrently": "^9.1.0",
     "playwright": "^1.61.1"
